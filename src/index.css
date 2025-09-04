@@ -1,0 +1,99 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Professional base styles */
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  body {
+    @apply bg-background text-text-primary antialiased;
+    margin: 0;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+  
+  * {
+    box-sizing: border-box;
+  }
+}
+
+/* Professional component styles */
+@layer components {
+  .btn-primary {
+    @apply bg-primary text-app-white px-6 py-3 rounded-professional font-medium 
+           hover:bg-app-grey-dark transition-colors duration-200 
+           focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
+           shadow-professional;
+  }
+  
+  .btn-secondary {
+    @apply bg-app-white text-primary border border-border px-6 py-3 rounded-professional font-medium 
+           hover:bg-surface transition-colors duration-200 
+           focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
+           shadow-professional;
+  }
+  
+  .input-field {
+    @apply w-full px-4 py-3 border border-border rounded-professional bg-app-white 
+           text-text-primary placeholder-text-muted
+           focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary
+           transition-colors duration-200;
+  }
+  
+  .card {
+    @apply bg-app-white rounded-professional shadow-professional-md border border-border p-6;
+  }
+  
+  .page-container {
+    @apply min-h-screen bg-background;
+  }
+  
+  .content-container {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8;
+  }
+  
+  .professional-heading {
+    @apply text-2xl font-semibold text-text-primary mb-6;
+  }
+  
+  .professional-subheading {
+    @apply text-lg font-medium text-text-primary mb-4;
+  }
+  
+  .professional-text {
+    @apply text-base text-text-secondary leading-relaxed;
+  }
+}
+
+/* Professional utility classes */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Loading animation */
+@keyframes pulse-professional {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse-professional {
+  animation: pulse-professional 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

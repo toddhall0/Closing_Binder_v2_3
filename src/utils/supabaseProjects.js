@@ -1,0 +1,583 @@
+// ===============================
+// FILE: src/utils/supabaseProjects.js
+// Complete Supabase Projects Service - Final Version with getAllProjects
+// ===============================
+
+import { supabase } from '../lib/supabase';
+
+class ProjectsService {
+  /**
+   * Get all projects for the current user
+   * @returns {Promise<{data: Array, error: Error|null}>}
+   */
+  static async getProjects() {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      return { data: data || [], error: null };
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      return { data: [], error };
+    }
+  }
+
+  /**
+   * Alias for getProjects() - for backward compatibility
+   * @returns {Promise<{data: Array, error: Error|null}>}
+   */
+  static async getAllProjects() {
+    return this.getProjects();
+  }
+
+  /**
+   * Get a single project by ID
+   * @param {string} projectId - Project ID
+   * @returns {Promise<{data: Object|null, error: Error|null}>}
+   */
+  static async getProject(projectId) {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No rows returned
+          return { data: null, error: new Error('Project not found') };
+        }
+        throw error;
+      }
+
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error fetching project:', error);
+      return { data: null, error };
+    }
+  }
+
+  /**
+   * Create a new project
+   * @param {Object} projectData - Project data
+   * @param {string} projectData.title - Project title
+   * @param {string} projectData.property_address - Property address
+   * @param {string} projectData.property_description - Property description
+   * @param {string} [projectData.cover_photo_url] - Cover photo URL
+   * @returns {Promise<{data: Object|null, error: Error|null}>}
+   */
+  static async createProject(projectData) {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Validate required fields
+      if (!projectData.title || !projectData.property_address) {
+        throw new Error('Title and property address are required');
+      }
+
+      const projectToInsert = {
+        user_id: user.id,
+        title: projectData.title.trim(),
+        property_address: projectData.property_address.trim(),
+        property_description: projectData.property_description?.trim() || '',
+        cover_photo_url: projectData.cover_photo_url || null
+      };
+
+      const { data, error } = await supabase
+        .from('projects')
+        .insert(projectToInsert)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error creating project:', error);
+      return { data: null, error };
+    }
+  }
+
+  /**
+   * Update an existing project
+   * @param {string} projectId - Project ID
+   * @param {Object} updates - Fields to update
+   * @returns {Promise<{data: Object|null, error: Error|null}>}
+   */
+  static async updateProject(projectId, updates) {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Filter out undefined values and trim strings
+      const filteredUpdates = {};
+      Object.keys(updates).forEach(key => {
+        if (updates[key] !== undefined) {
+          filteredUpdates[key] = typeof updates[key] === 'string' 
+            ? updates[key].trim() 
+            : updates[key];
+        }
+      });
+
+      // Don't allow updating user_id or id
+      delete filteredUpdates.id;
+      delete filteredUpdates.user_id;
+
+      if (Object.keys(filteredUpdates).length === 0) {
+        throw new Error('No valid fields to update');
+      }
+
+      const { data, error } = await supabase
+        .from('projects')
+        .update(filteredUpdates)
+        .eq('id', projectId)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          throw new Error('Project not found or you do not have permission to update it');
+        }
+        throw error;
+      }
+
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error updating project:', error);
+      return { data: null, error };
+    }
+  }
+
+  /**
+   * Delete a project and all its related data (CORRECTED VERSION)
+   * @param {string} projectId - Project ID to delete
+   * @returns {Promise<{success: boolean, error: Error|null}>}
+   */
+  static async deleteProject(projectId) {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Step 1: Get all sections for this project first
+      const { data: sections, error: sectionsError } = await supabase
+        .from('sections')
+        .select('id')
+        .eq('project_id', projectId);
+
+      // Step 2: Delete documents if sections exist
+      if (!sectionsError && sections && sections.length > 0) {
+        const sectionIds = sections.map(section => section.id);
+        
+        const { error: documentsError } = await supabase
+          .from('documents')
+          .delete()
+          .in('section_id', sectionIds);
+
+        if (documentsError && documentsError.code !== 'PGRST116') {
+          console.warn('Error deleting documents:', documentsError);
+          // Continue with deletion process
+        }
+      }
+
+      // Step 3: Delete any orphaned documents directly linked to project
+      const { error: orphanedDocumentsError } = await supabase
+        .from('documents')
+        .delete()
+        .eq('project_id', projectId);
+
+      if (orphanedDocumentsError && orphanedDocumentsError.code !== 'PGRST116') {
+        console.warn('Error deleting orphaned documents:', orphanedDocumentsError);
+        // Continue with deletion process
+      }
+
+      // Step 4: Delete sections
+      const { error: deleteSectionsError } = await supabase
+        .from('sections')
+        .delete()
+        .eq('project_id', projectId);
+
+      if (deleteSectionsError && deleteSectionsError.code !== 'PGRST116') {
+        console.warn('Error deleting sections:', deleteSectionsError);
+        // Continue with deletion process
+      }
+
+      // Step 5: Delete logos
+      const { error: logosError } = await supabase
+        .from('logos')
+        .delete()
+        .eq('project_id', projectId);
+
+      if (logosError && logosError.code !== 'PGRST116') {
+        console.warn('Error deleting logos:', logosError);
+        // Continue with deletion process
+      }
+
+      // Step 6: Clean up storage files (optional but recommended)
+      try {
+        // Delete documents from storage
+        const { data: files, error: listError } = await supabase.storage
+          .from('documents')
+          .list(`${user.id}/${projectId}`);
+
+        if (!listError && files && files.length > 0) {
+          const filePaths = files.map(file => `${user.id}/${projectId}/${file.name}`);
+          
+          const { error: storageError } = await supabase.storage
+            .from('documents')
+            .remove(filePaths);
+
+          if (storageError) {
+            console.warn('Error deleting document files:', storageError);
+          }
+        }
+
+        // Delete images from storage
+        const { data: imageFiles, error: imageListError } = await supabase.storage
+          .from('images')
+          .list(`${user.id}/${projectId}`);
+
+        if (!imageListError && imageFiles && imageFiles.length > 0) {
+          const imagePaths = imageFiles.map(file => `${user.id}/${projectId}/${file.name}`);
+          
+          const { error: imageStorageError } = await supabase.storage
+            .from('images')
+            .remove(imagePaths);
+
+          if (imageStorageError) {
+            console.warn('Error deleting image files:', imageStorageError);
+          }
+        }
+      } catch (storageError) {
+        console.warn('Storage cleanup failed, continuing with project deletion:', storageError);
+      }
+
+      // Step 7: Finally delete the project itself
+      const { error: projectError } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', projectId)
+        .eq('user_id', user.id);
+
+      if (projectError) {
+        if (projectError.code === 'PGRST116') {
+          throw new Error('Project not found or already deleted');
+        }
+        throw projectError;
+      }
+      
+      return { success: true, error: null };
+      
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      return { 
+        success: false, 
+        error: {
+          message: error.message || 'Failed to delete project',
+          details: error
+        }
+      };
+    }
+  }
+
+  /**
+   * Search projects by title or address
+   * @param {string} searchTerm - Search term
+   * @returns {Promise<{data: Array, error: Error|null}>}
+   */
+  static async searchProjects(searchTerm) {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+      if (!searchTerm || searchTerm.trim().length === 0) {
+        return this.getProjects(); // Return all projects if no search term
+      }
+
+      const searchQuery = `%${searchTerm.trim()}%`;
+
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('user_id', user.id)
+        .or(`title.ilike.${searchQuery},property_address.ilike.${searchQuery}`)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      return { data: data || [], error: null };
+    } catch (error) {
+      console.error('Error searching projects:', error);
+      return { data: [], error };
+    }
+  }
+
+  /**
+   * Get project statistics
+   * @returns {Promise<{data: Object, error: Error|null}>}
+   */
+  static async getProjectStats() {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+      const { data: projects, error: projectsError } = await supabase
+        .from('projects')
+        .select('id, created_at')
+        .eq('user_id', user.id);
+
+      if (projectsError) throw projectsError;
+
+      const projectIds = projects.map(p => p.id);
+
+      let documentsCount = 0;
+      if (projectIds.length > 0) {
+        const { count, error: documentsError } = await supabase
+          .from('documents')
+          .select('*', { count: 'exact', head: true })
+          .in('project_id', projectIds);
+
+        if (documentsError && documentsError.code !== 'PGRST116') {
+          console.warn('Error getting documents count:', documentsError);
+        } else {
+          documentsCount = count || 0;
+        }
+      }
+
+      const stats = {
+        totalProjects: projects.length,
+        totalDocuments: documentsCount,
+        recentProjects: projects.filter(p => {
+          const projectDate = new Date(p.created_at);
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          return projectDate > thirtyDaysAgo;
+        }).length
+      };
+
+      return { data: stats, error: null };
+    } catch (error) {
+      console.error('Error fetching project stats:', error);
+      return { 
+        data: { totalProjects: 0, totalDocuments: 0, recentProjects: 0 }, 
+        error 
+      };
+    }
+  }
+
+  /**
+   * Duplicate/Clone a project
+   * @param {string} projectId - Project ID to duplicate
+   * @param {string} newTitle - New title for the duplicated project
+   * @returns {Promise<{data: Object|null, error: Error|null}>}
+   */
+  static async duplicateProject(projectId, newTitle) {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Get the original project
+      const { data: originalProject, error: fetchError } = await this.getProject(projectId);
+      
+      if (fetchError || !originalProject) {
+        throw new Error('Original project not found');
+      }
+
+      // Create new project with copied data
+      const newProjectData = {
+        title: newTitle || `${originalProject.title} (Copy)`,
+        property_address: originalProject.property_address,
+        property_description: originalProject.property_description,
+        cover_photo_url: originalProject.cover_photo_url
+      };
+
+      const { data: newProject, error: createError } = await this.createProject(newProjectData);
+      
+      if (createError) throw createError;
+
+      return { data: newProject, error: null };
+    } catch (error) {
+      console.error('Error duplicating project:', error);
+      return { data: null, error };
+    }
+  }
+
+  /**
+   * Check if user has access to a project
+   * @param {string} projectId - Project ID
+   * @returns {Promise<boolean>}
+   */
+  static async hasProjectAccess(projectId) {
+    try {
+      const { data, error } = await this.getProject(projectId);
+      return !error && data !== null;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Get projects with document counts
+   * @returns {Promise<{data: Array, error: Error|null}>}
+   */
+  static async getProjectsWithCounts() {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+      const { data, error } = await supabase
+        .from('projects')
+        .select(`
+          *,
+          documents(count),
+          sections(count)
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Format the data to include counts
+      const formattedData = (data || []).map(project => ({
+        ...project,
+        document_count: project.documents?.[0]?.count || 0,
+        section_count: project.sections?.[0]?.count || 0
+      }));
+
+      return { data: formattedData, error: null };
+    } catch (error) {
+      console.error('Error fetching projects with counts:', error);
+      return { data: [], error };
+    }
+  }
+
+  /**
+   * Get a project with related data (documents, sections, etc.)
+   * @param {string} projectId - Project ID
+   * @returns {Promise<{data: Object|null, error: Error|null}>}
+   */
+  static async getProjectWithDetails(projectId) {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+      const { data, error } = await supabase
+        .from('projects')
+        .select(`
+          *,
+          documents(*),
+          sections(*),
+          logos(*)
+        `)
+        .eq('id', projectId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return { data: null, error: new Error('Project not found') };
+        }
+        throw error;
+      }
+
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error fetching project with details:', error);
+      return { data: null, error };
+    }
+  }
+
+  /**
+   * Batch delete projects
+   * @param {Array<string>} projectIds - Array of project IDs to delete
+   * @returns {Promise<{success: boolean, results: Array, error: Error|null}>}
+   */
+  static async batchDeleteProjects(projectIds) {
+    try {
+      if (!projectIds || projectIds.length === 0) {
+        throw new Error('No projects specified for deletion');
+      }
+
+      const results = [];
+      
+      for (const projectId of projectIds) {
+        const result = await this.deleteProject(projectId);
+        results.push({
+          projectId,
+          success: result.success,
+          error: result.error
+        });
+      }
+
+      const successCount = results.filter(r => r.success).length;
+      const hasFailures = results.some(r => !r.success);
+
+      return { 
+        success: !hasFailures, 
+        results,
+        summary: {
+          total: projectIds.length,
+          successful: successCount,
+          failed: projectIds.length - successCount
+        },
+        error: null 
+      };
+    } catch (error) {
+      console.error('Error batch deleting projects:', error);
+      return { 
+        success: false, 
+        results: [],
+        error: {
+          message: error.message || 'Failed to batch delete projects',
+          details: error
+        }
+      };
+    }
+  }
+}
+
+export default ProjectsService;

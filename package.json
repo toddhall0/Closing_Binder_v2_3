@@ -1,0 +1,64 @@
+{
+  "name": "pdf-closing-binder",
+  "version": "1.0.0",
+  "description": "Professional PDF document organization and closing binder application",
+  "private": true,
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@heroicons/react": "^2.2.0",
+    "@react-pdf/renderer": "^3.4.5",
+    "@supabase/supabase-js": "^2.56.1",
+    "@tailwindcss/line-clamp": "^0.4.4",
+    "clsx": "^2.1.1",
+    "date-fns": "^2.29.3",
+    "file-saver": "^2.0.5",
+    "lodash": "^4.17.21",
+    "lucide-react": "^0.542.0",
+    "pdf-lib": "^1.17.1",
+    "react": "^18.2.0",
+    "react-color": "^2.19.3",
+    "react-dom": "^18.2.0",
+    "react-dropzone": "^14.3.8",
+    "react-router-dom": "^6.8.1",
+    "react-scripts": "5.0.1",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^5.16.5",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^13.5.0",
+    "@types/file-saver": "^2.0.5",
+    "@types/lodash": "^4.14.191",
+    "@types/uuid": "^9.0.0",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
+    "web-vitals": "^2.1.4"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}
