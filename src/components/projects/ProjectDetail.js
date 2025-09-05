@@ -4,12 +4,14 @@
 // ===============================
 
 import React, { useState, useEffect, useCallback } from 'react';
+import PublishBinderButton from './PublishBinderButton';
 import { useParams, useNavigate } from 'react-router-dom';
 import ProjectsService from '../../utils/supabaseProjects';
 import LoadingSpinner from '../common/LoadingSpinner';
 import DocumentUpload from '../upload/DocumentUpload';
 import DocumentOrganization from '../documents/organization/DocumentOrganization';
 import GenerateBinder from './GenerateBinder';
+import { documentOrganizationService } from '../../utils/documentOrganizationService';
 
 const ProjectDetail = () => {
   const { id: projectId } = useParams();
@@ -28,6 +30,8 @@ const ProjectDetail = () => {
     sections: 0,
     subsections: 0
   });
+  const [structure, setStructure] = useState({ sections: [], documents: [] });
+  const [logos, setLogos] = useState([]);
 
   // Memoized load functions to prevent infinite re-renders
   const loadProject = useCallback(async () => {
@@ -56,6 +60,31 @@ const ProjectDetail = () => {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  }, [projectId]);
+
+  const loadProjectStructure = useCallback(async () => {
+    try {
+      const data = await documentOrganizationService.getProjectStructure(projectId);
+      setStructure(data);
+    } catch (err) {
+      console.error('Error loading project structure:', err);
+    }
+  }, [projectId]);
+
+  const loadLogos = useCallback(async () => {
+    try {
+      const { supabase } = await import('../../lib/supabase');
+      const { data, error } = await supabase
+        .from('logos')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('logo_position');
+      if (!error) {
+        setLogos(data || []);
+      }
+    } catch (err) {
+      console.error('Error loading logos:', err);
     }
   }, [projectId]);
 
@@ -136,8 +165,10 @@ const ProjectDetail = () => {
       loadProject();
       loadProjectDocuments();
       loadProjectStats();
+      loadProjectStructure();
+      loadLogos();
     }
-  }, [projectId, loadProject, loadProjectDocuments, loadProjectStats]);
+  }, [projectId, loadProject, loadProjectDocuments, loadProjectStats, loadProjectStructure, loadLogos]);
 
   // Handle project update
   const handleUpdateProject = async (e) => {
@@ -196,15 +227,16 @@ const ProjectDetail = () => {
   }, [loadProjectDocuments, loadProjectStats]);
 
   // Handle organization changes - stable callback to prevent infinite loops
-  const handleOrganizationChange = useCallback((structure) => {
+  const handleOrganizationChange = useCallback((newStructure) => {
     console.log('Organization changed, updating stats from provided structure');
     
-    if (structure && structure.sections && structure.documents) {
-      const sectionsCount = structure.sections.filter(s => s.section_type === 'section').length;
-      const subsectionsCount = structure.sections.filter(s => s.section_type === 'subsection').length;
+    if (newStructure && newStructure.sections && newStructure.documents) {
+      setStructure(newStructure);
+      const sectionsCount = newStructure.sections.filter(s => s.section_type === 'section').length;
+      const subsectionsCount = newStructure.sections.filter(s => s.section_type === 'subsection').length;
       
       setProjectStats({
-        documents: structure.documents.length,
+        documents: newStructure.documents.length,
         sections: sectionsCount,
         subsections: subsectionsCount
       });
@@ -730,6 +762,14 @@ const ProjectDetail = () => {
         loadProjectStats();
       }}
     />
+    <div>
+      <PublishBinderButton
+        project={project}
+        documents={structure.documents}
+        sections={structure.sections}
+        logos={logos}
+      />
+    </div>
   </div>
 )}
 

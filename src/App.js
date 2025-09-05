@@ -1,4 +1,5 @@
 // src/App.js
+import './debug-env'; // Add this line at the top
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
@@ -9,8 +10,10 @@ import Login from './components/auth/Login';
 import Signup from './components/auth/Signup';
 import Dashboard from './components/dashboard/Dashboard';
 import ProjectDetail from './components/projects/ProjectDetail';
-import './index.css';
 import DocumentViewer from './components/DocumentViewer';
+import './index.css';
+
+
 
 function App() {
   return (
@@ -20,10 +23,13 @@ function App() {
           <Header />
           <main>
             <Routes>
+              {/* Public Routes */}
               <Route path="/" element={<PublicLanding />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
-	      <Route path="/document-viewer" element={<DocumentViewer />} />
+              <Route path="/document-viewer" element={<DocumentViewer />} />
+              
+              {/* Protected Application Routes */}
               <Route 
                 path="/dashboard" 
                 element={
@@ -40,6 +46,7 @@ function App() {
                   </ProtectedRoute>
                 } 
               />
+              {/* Note: client-specific routes are disabled until components are added */}
             </Routes>
           </main>
         </div>
