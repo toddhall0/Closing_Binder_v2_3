@@ -11,6 +11,7 @@ import Signup from './components/auth/Signup';
 import Dashboard from './components/dashboard/Dashboard';
 import ProjectDetail from './components/projects/ProjectDetail';
 import DocumentViewer from './components/DocumentViewer';
+import ClientBinderViewer from './components/client/ClientBinderViewer';
 import './index.css';
 
 
@@ -46,7 +47,8 @@ function App() {
                   </ProtectedRoute>
                 } 
               />
-              {/* Note: client-specific routes are disabled until components are added */}
+              {/* Public client-facing route */}
+              <Route path="/client-binder/:accessCode" element={<ClientBinderViewer />} />
             </Routes>
           </main>
         </div>
