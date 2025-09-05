@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { validateEmail, validatePassword } from '../../utils/validation';
+import { validateEmail } from '../../utils/validation';
 import LoadingSpinner from '../common/LoadingSpinner';
 
 const LoginForm = ({ onToggleForm, onClose }) => {

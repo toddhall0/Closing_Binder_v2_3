@@ -1,6 +1,6 @@
 // src/hooks/useFileUpload.js
 
-import React, { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { UploadService } from '../services/uploadService';
 import { validateFiles } from '../services/fileValidation';
 
@@ -115,7 +115,7 @@ export const useFileUpload = (projectId, sectionId = null, onUploadComplete = nu
       
       return result;
     }
-  }, [projectId, sectionId, updateQueueItem]);
+  }, [projectId, sectionId, updateQueueItem, onUploadComplete]);
 
   const retryUpload = useCallback(async (queueItem) => {
     updateQueueItem(queueItem.id, {

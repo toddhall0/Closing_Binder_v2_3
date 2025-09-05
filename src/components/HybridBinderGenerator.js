@@ -3,8 +3,8 @@
 // Hybrid binder generator with WORKING PDF generation
 // ===============================
 
-import React, { useState, useEffect } from 'react';
-import { Globe, FileText, Download, Settings, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Globe, FileText, RefreshCw, Download } from 'lucide-react';
 import { documentOrganizationService } from '../utils/documentOrganizationService';
 import CoverPageHTML from './web/CoverPageHTML';
 import TableOfContentsHTML from './web/TableOfContentsHTML';
@@ -18,22 +18,14 @@ const HybridBinderGenerator = ({ project, onProjectUpdate }) => {
   const [generatedWeb, setGeneratedWeb] = useState(false);
 
   // Load documents when component mounts or project changes
-  useEffect(() => {
-    if (project?.id) {
-      loadDocuments();
-    }
-  }, [project?.id]);
-
-  const loadDocuments = async () => {
+  const loadDocuments = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       console.log('Loading documents for project:', project.id);
       const structureData = await documentOrganizationService.getProjectStructure(project.id);
-      
       setStructure(structureData);
       setDocuments(structureData.documents || []);
-      
       console.log('Documents loaded successfully:', {
         sections: structureData.sections.length,
         documents: structureData.documents.length
@@ -44,7 +36,15 @@ const HybridBinderGenerator = ({ project, onProjectUpdate }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [project?.id]);
+
+  useEffect(() => {
+    if (project?.id) {
+      loadDocuments();
+    }
+  }, [project?.id, loadDocuments]);
+
+  
 
   const handleGenerateWeb = () => {
     console.log('handleGenerateWeb called with:', {

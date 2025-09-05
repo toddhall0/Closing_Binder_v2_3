@@ -70,7 +70,7 @@ export const useBinderGeneration = (project) => {
       console.error('Error estimating size:', error);
       setEstimatedSize(0);
     }
-  }, [project?.id, options]);
+  }, [project?.id, options.includeCoverPage, options.includeTableOfContents, options.includeAllDocuments]);
 
   const loadProjectData = useCallback(async () => {
     if (!project?.id) throw new Error('No project provided');
@@ -130,6 +130,22 @@ export const useBinderGeneration = (project) => {
     }
     
     return validLogos;
+  }, []);
+
+  // Helper function to format purchase price
+  const formatPurchasePrice = useCallback((value) => {
+    if (!value) return '';
+    if (typeof value === 'string' && value.startsWith('$')) {
+      return value;
+    }
+    const numStr = value.toString().replace(/[^\d.]/g, '');
+    if (!numStr || numStr === '0') return '$0.00';
+    const num = parseFloat(numStr);
+    if (isNaN(num)) return '';
+    return '$' + num.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
   }, []);
 
   const generateCoverPagePDF = useCallback(async (projectData, logos) => {
@@ -208,30 +224,6 @@ export const useBinderGeneration = (project) => {
     }
   }, [updateProgress, validateAndProcessLogos]);
 
-  // Helper function to format purchase price
-  const formatPurchasePrice = useCallback((value) => {
-    if (!value) return '';
-    
-    // If already formatted with $, use as is
-    if (typeof value === 'string' && value.startsWith('$')) {
-      return value;
-    }
-    
-    // Convert to string and remove all non-digit chars except decimal
-    const numStr = value.toString().replace(/[^\d.]/g, '');
-    
-    if (!numStr || numStr === '0') return '$0.00';
-    
-    // Convert to number to handle decimals properly
-    const num = parseFloat(numStr);
-    if (isNaN(num)) return '';
-    
-    // Format with commas and 2 decimal places
-    return '$' + num.toLocaleString('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
-  }, []);
 
   const generateTableOfContentsPDF = useCallback(async (projectData, logos, structure, documentBookmarks = new Map()) => {
     if (cancelRef.current) throw new Error('Operation cancelled');
@@ -335,7 +327,8 @@ export const useBinderGeneration = (project) => {
 
     let addedCount = 0;
     const addedDocuments = [];
-    const documentBookmarks = new Map(); // Track bookmarks for TOC
+    // Track bookmarks for TOC (not currently used)
+    const documentBookmarks = new Map();
 
     // Helper function to safely add a PDF with detailed error handling
     const safeAddPdf = async (blob, title, isFirstLevel = true) => {

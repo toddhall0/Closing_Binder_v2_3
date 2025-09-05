@@ -136,7 +136,7 @@ export class PDFBinderGenerator {
       await this.generateSimpleTableOfContents(project, numberedStructure, logos);
       
       // Add all documents after cover and TOC
-      const documentPageInfo = await this.addDocumentsInOrder(numberedStructure);
+      await this.addDocumentsInOrder(numberedStructure);
       
       // Skip bookmarks for now to avoid stack overflow
       console.log('Skipping bookmarks to avoid circular reference issues');

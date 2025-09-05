@@ -5,7 +5,6 @@
 
 import React, { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { documentUrlUtils } from '../utils/documentUrlUtils';
 
 const DocumentViewer = () => {
   const [searchParams] = useSearchParams();
@@ -13,7 +12,6 @@ const DocumentViewer = () => {
   useEffect(() => {
     const openDocument = async () => {
       const documentUrl = searchParams.get('url');
-      const documentName = searchParams.get('name') || 'Document';
       
       if (!documentUrl) {
         alert('No document URL provided');

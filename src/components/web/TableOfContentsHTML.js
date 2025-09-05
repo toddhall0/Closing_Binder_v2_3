@@ -3,18 +3,14 @@
 // Interactive HTML Table of Contents - FIXED VERSION
 // ===============================
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { ExternalLink } from 'lucide-react';
 
 const TableOfContentsHTML = ({ project, documents, structure }) => {
   const [logos, setLogos] = useState([]);
 
   // Load logos when component mounts
-  useEffect(() => {
-    loadLogos();
-  }, [project?.id]);
-
-  const loadLogos = async () => {
+  const loadLogos = useCallback(async () => {
     if (!project?.id) return;
     
     try {
@@ -36,7 +32,12 @@ const TableOfContentsHTML = ({ project, documents, structure }) => {
     } catch (error) {
       console.error('Error loading logos for TOC:', error);
     }
-  };
+  }, [project?.id]);
+
+  useEffect(() => {
+    loadLogos();
+  }, [project?.id, loadLogos]);
+
 
   // Create numbered structure for display
   const numberedStructure = useMemo(() => {

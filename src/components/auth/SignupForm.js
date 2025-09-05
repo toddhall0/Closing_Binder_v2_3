@@ -79,7 +79,7 @@ const SignupForm = ({ onToggleForm, onClose }) => {
     if (!validateForm()) return;
 
     setIsSubmitting(true);
-    const { data, error } = await signUp(formData.email, formData.password, {
+    const { error } = await signUp(formData.email, formData.password, {
       first_name: formData.firstName,
       last_name: formData.lastName,
       full_name: `${formData.firstName} ${formData.lastName}`

@@ -4,7 +4,7 @@
 // ===============================
 
 import React, { useState, useRef, useCallback } from 'react';
-import { Camera, Upload, Trash2, RotateCw } from 'lucide-react';
+import { Camera, Trash2, RotateCw } from 'lucide-react';
 import { validateImageFile, uploadImageToSupabase, deleteImageFromSupabase, generateUniqueFileName, resizeImage } from '../../utils/imageUpload';
 
 const PropertyPhotoManager = ({ projectId, photo, onPhotoChange }) => {

@@ -3,9 +3,9 @@
 // Updated Cover Page Editor with REAL logo and photo upload integration
 // ===============================
 
-import React, { useState, useEffect } from 'react';
-import { Camera, Upload, Download, Save } from 'lucide-react';
-import { PDFDownloadLink, BlobProvider } from '@react-pdf/renderer';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Camera, Download, Save } from 'lucide-react';
+import { PDFDownloadLink } from '@react-pdf/renderer';
 import CoverPagePDF from './CoverPagePDF';
 import LogoManager from './LogoManager';
 import PropertyPhotoManager from './PropertyPhotoManager';
@@ -54,13 +54,7 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
     });
   };
 
-  // Load existing data on component mount
-  useEffect(() => {
-    loadCoverData();
-    loadLogos();
-  }, [project?.id]);
-
-  const loadCoverData = async () => {
+  const loadCoverData = useCallback(async () => {
     if (!project?.id) return;
     
     try {
@@ -104,9 +98,9 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [project?.id]);
 
-  const loadLogos = async () => {
+  const loadLogos = useCallback(async () => {
     if (!project?.id) return;
     
     try {
@@ -132,7 +126,13 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
     } catch (error) {
       console.error('Error loading logos:', error);
     }
-  };
+  }, [project?.id]);
+
+  // Load existing data on component mount
+  useEffect(() => {
+    loadCoverData();
+    loadLogos();
+  }, [loadCoverData, loadLogos]);
 
   const handlePurchasePriceChange = (e) => {
     const inputValue = e.target.value;

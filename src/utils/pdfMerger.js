@@ -3,7 +3,7 @@
 // FIXED PDF merging utilities with WORKING bookmarks and internal links
 // ===============================
 
-import { PDFDocument, PDFName, PDFDict, PDFArray, PDFRef, rgb, StandardFonts } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFDict, PDFArray, rgb, StandardFonts } from 'pdf-lib';
 
 export class PDFMerger {
   constructor() {

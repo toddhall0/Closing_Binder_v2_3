@@ -24,12 +24,11 @@ const DocumentUpload = ({ projectId, sectionId = null, onUploadComplete }) => {
     isUploading,
     uploadStats,
     addToQueue,
-    processQueue,
     retryUpload,
     removeFromQueue,
     clearQueue,
     clearCompleted,
-    autoProcessQueue
+    // autoProcessQueue is managed internally via effect; not used directly here
   } = useFileUpload(projectId, sectionId, handleIndividualUploadComplete);
 
   const onDrop = useCallback((acceptedFiles, rejectedFiles) => {

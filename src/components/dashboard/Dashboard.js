@@ -1,11 +1,9 @@
 // src/components/dashboard/Dashboard.js
 import React, { useState } from 'react';
 import { ProjectsDashboard } from '../projects/ProjectsDashboard';
-import { useAuth } from '../../contexts/AuthContext';
 
 const Dashboard = () => {
-  const { user } = useAuth();
-  const [selectedProject, setSelectedProject] = useState(null);
+  const [, setSelectedProject] = useState(null);
 
   const handleProjectSelect = (project) => {
     setSelectedProject(project);

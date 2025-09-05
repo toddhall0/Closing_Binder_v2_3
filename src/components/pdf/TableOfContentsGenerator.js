@@ -3,7 +3,7 @@
 // COMPLETE IMPLEMENTATION - Replace your existing file with this
 // ===============================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Download, Eye, FileText, RefreshCw, ExternalLink, AlertTriangle } from 'lucide-react';
 import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
 import { documentOrganizationService } from '../../utils/documentOrganizationService';
@@ -26,34 +26,21 @@ const TableOfContentsGenerator = ({ project }) => {
   const [documentUrls, setDocumentUrls] = useState({});
   const [urlsLoading, setUrlsLoading] = useState(false);
 
-  useEffect(() => {
-    loadTableOfContentsData();
-    loadLogos();
-  }, [project.id]);
-
-  const loadTableOfContentsData = async () => {
+  const loadTableOfContentsData = useCallback(async () => {
     setLoading(true);
     try {
       console.log('Loading TOC data for project:', project.id);
-      
       const structureData = await documentOrganizationService.getProjectStructure(project.id);
       setStructure(structureData);
-
-      // Calculate statistics
       const total = structureData.documents.length;
       const organized = structureData.documents.filter(doc => doc.section_id).length;
       const unorganized = total - organized;
-      
       const sections = structureData.sections.filter(s => s.section_type === 'section').length;
       const subsections = structureData.sections.filter(s => s.section_type === 'subsection').length;
-
       setDocumentStats({ total, organized, unorganized, sections, subsections });
-      
-      // Pre-generate all document URLs for PDF links
       if (structureData.documents.length > 0) {
         await generateAllDocumentUrls(structureData.documents);
       }
-      
       console.log('TOC data loaded successfully:', {
         sections: structureData.sections.length,
         documents: structureData.documents.length
@@ -64,7 +51,11 @@ const TableOfContentsGenerator = ({ project }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [project.id]);
+
+  useEffect(() => {
+    loadTableOfContentsData();
+  }, [project.id, loadTableOfContentsData]);
 
   const generateAllDocumentUrls = async (documents) => {
     setUrlsLoading(true);
@@ -102,7 +93,7 @@ const TableOfContentsGenerator = ({ project }) => {
     }
   };
 
-  const loadLogos = async () => {
+  const loadLogos = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('logos')
@@ -118,7 +109,11 @@ const TableOfContentsGenerator = ({ project }) => {
     } catch (error) {
       console.error('Exception loading logos:', error);
     }
-  };
+  }, [project.id]);
+
+  useEffect(() => {
+    loadLogos();
+  }, [project.id, loadLogos]);
 
   const handleTestDocumentLinks = async () => {
     if (structure.documents.length === 0) {

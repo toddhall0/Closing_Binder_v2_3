@@ -5,7 +5,7 @@ import { ProjectCard } from './ProjectCard';
 import { CreateProjectModal } from './CreateProjectModal';
 import { ConfirmationDialog } from './ConfirmationDialog';
 import { Button } from './Button';
-import { Input } from './Input';
+// Removed unused Input import
 import { LoadingSpinner } from './LoadingSpinner';
 
 
@@ -15,9 +15,7 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
     projects,
     loading,
     error,
-    searchTerm,
     createProject,
-    updateProject,
     deleteProject,
     handleSearch,
     clearError,

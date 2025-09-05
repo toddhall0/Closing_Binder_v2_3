@@ -3,7 +3,7 @@
 // Adds REAL PDF navigation links and "Back to TOC" buttons using pdf-lib
 // ===============================
 
-import { PDFDocument, PDFName, PDFArray, PDFDict, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, PDFName, StandardFonts, rgb } from 'pdf-lib';
 
 export class PDFNavigationEnhancer {
   constructor() {

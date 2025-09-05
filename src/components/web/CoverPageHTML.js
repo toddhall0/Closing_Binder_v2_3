@@ -3,18 +3,15 @@
 // HTML Cover Page for Web Binder - TIGHTER SPACING + LINE BREAKS
 // ===============================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 const CoverPageHTML = ({ project }) => {
   const [logos, setLogos] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Load logos when component mounts
-  useEffect(() => {
-    loadLogos();
-  }, [project?.id]);
+  // Load logos when component mounts (effect placed after definition for lint)
 
-  const loadLogos = async () => {
+  const loadLogos = useCallback(async () => {
     console.log('Loading logos for project ID:', project?.id);
     
     if (!project?.id) {
@@ -44,7 +41,11 @@ const CoverPageHTML = ({ project }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [project?.id]);
+
+  useEffect(() => {
+    loadLogos();
+  }, [loadLogos]);
 
   // Get current date for generation timestamp
   const currentDate = new Date().toLocaleDateString('en-US', {

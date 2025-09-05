@@ -107,11 +107,18 @@ export const documentOrganizationService = {
     try {
       // Get the next sort order for this level
       let sortOrder = 0;
-      const { data: existingSections, error: countError } = await supabase
+      let query = supabase
         .from('sections')
         .select('sort_order')
-        .eq('project_id', sectionData.project_id)
-        .eq('parent_section_id', sectionData.parent_section_id || null)
+        .eq('project_id', sectionData.project_id);
+
+      if (sectionData.parent_section_id === null || sectionData.parent_section_id === undefined) {
+        query = query.is('parent_section_id', null);
+      } else {
+        query = query.eq('parent_section_id', sectionData.parent_section_id);
+      }
+
+      const { data: existingSections, error: countError } = await query
         .order('sort_order', { ascending: false })
         .limit(1);
 
