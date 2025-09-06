@@ -1,4 +1,4 @@
-// src/components/client/ClientTableOfContents.js
+// src/components/client/ClientTableOfContents.js - Updated with 25% larger logos
 import React, { useMemo } from 'react';
 import { FileText, Download, Eye, ArrowLeft, ExternalLink } from 'lucide-react';
 
@@ -174,7 +174,7 @@ const ClientTableOfContents = ({ binder, documents, logos, onNavigateToCover, on
           </button>
         </div>
 
-        {/* Company Logos */}
+        {/* Company Logos - MADE 25% LARGER */}
         {logos && logos.length > 0 && (
           <div className="flex justify-center items-center space-x-8 mb-6">
             {logos.slice(0, 3).map((logo, index) => (
@@ -182,7 +182,8 @@ const ClientTableOfContents = ({ binder, documents, logos, onNavigateToCover, on
                 key={logo.id || index}
                 src={logo.logo_url}
                 alt={logo.logo_name || `Company Logo ${index + 1}`}
-                className="max-h-12 max-w-24 object-contain"
+                className="max-h-30 max-w-60 object-contain"
+                style={{ maxHeight: '120px', maxWidth: '180px' }}
                 onError={(e) => {
                   e.target.style.display = 'none';
                 }}
@@ -291,6 +292,7 @@ const ClientTableOfContents = ({ binder, documents, logos, onNavigateToCover, on
           </p>
         </div>
       </div>
+
     </div>
   );
 };

@@ -164,7 +164,7 @@ export class ClientDashboardService {
   }
 
   /**
-   * Get client binder by access code (public access)
+   * Get client binder by access code (public access) - FIXED VERSION
    * @param {string} accessCode - Access code
    * @param {string} password - Optional password for protected binders
    * @returns {Promise<{data: Object|null, error: Error|null}>}
@@ -175,6 +175,9 @@ export class ClientDashboardService {
         .from('client_binders')
         .select(`
           *,
+          projects(
+            *
+          ),
           client_binder_documents(
             document_id,
             is_downloadable,
@@ -212,10 +215,49 @@ export class ClientDashboardService {
         }
       }
 
+      // IMPORTANT: Merge project data with binder data
+      // This ensures all project fields are available to the client components
+      const enrichedData = {
+        ...data,
+        // Use binder data first, fall back to project data
+        title: data.title || data.projects?.title,
+        property_address: data.property_address || data.projects?.property_address,
+        property_description: data.property_description || data.projects?.property_description,
+        cover_photo_url: data.cover_photo_url || data.projects?.cover_photo_url,
+        city: data.city || data.projects?.city,
+        state: data.state || data.projects?.state,
+        zip_code: data.zip_code || data.projects?.zip_code,
+        // Add any other project fields you need
+        buyer: data.buyer || data.projects?.buyer,
+        seller: data.seller || data.projects?.seller,
+        attorney: data.attorney || data.projects?.attorney,
+        lender: data.lender || data.projects?.lender,
+        escrow_agent: data.escrow_agent || data.projects?.escrow_agent,
+        title_company: data.title_company || data.projects?.title_company,
+        real_estate_agent: data.real_estate_agent || data.projects?.real_estate_agent,
+      };
+
+      // Also fetch logos for this project
+      try {
+        const { data: logosData, error: logosError } = await supabase
+          .from('logos')
+          .select('*')
+          .eq('project_id', data.project_id)
+          .order('logo_position');
+
+        if (!logosError && logosData) {
+          enrichedData.logos = logosData;
+        }
+      } catch (logosError) {
+        console.log('Error fetching logos (non-critical):', logosError);
+      }
+
       // Track the view
       await this.trackBinderView(data.id);
 
-      return { data, error: null };
+      console.log('Enriched binder data:', enrichedData);
+      
+      return { data: enrichedData, error: null };
     } catch (error) {
       console.error('Error fetching binder by access code:', error);
       return { data: null, error };
@@ -379,17 +421,28 @@ export class ClientDashboardService {
     try {
       const updateField = action === 'download' ? 'download_count' : 'view_count';
       
-      const { error } = await supabase
+      // Update document access count
+      await supabase
         .from('client_binder_documents')
-        .update({
+        .update({ 
           [updateField]: supabase.raw(`${updateField} + 1`),
           last_accessed_at: new Date().toISOString()
         })
         .eq('client_binder_id', binderId)
         .eq('document_id', documentId);
 
+      // Record detailed access log
+      const { error } = await supabase
+        .from('client_document_access_logs')
+        .insert({
+          client_binder_id: binderId,
+          document_id: documentId,
+          access_type: action,
+          accessed_at: new Date().toISOString()
+        });
+
       if (error) {
-        console.warn('Error tracking document access:', error);
+        console.warn('Error logging document access:', error);
       }
     } catch (error) {
       console.warn('Error in trackDocumentAccess:', error);
@@ -399,10 +452,9 @@ export class ClientDashboardService {
   /**
    * Get binder analytics
    * @param {string} binderId - Client binder ID
-   * @param {number} days - Number of days to analyze (default: 30)
    * @returns {Promise<{data: Object|null, error: Error|null}>}
    */
-  static async getBinderAnalytics(binderId, days = 30) {
+  static async getBinderAnalytics(binderId) {
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
@@ -410,50 +462,56 @@ export class ClientDashboardService {
         throw new Error('User not authenticated');
       }
 
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-
-      // Get view data
-      const { data: views, error: viewsError } = await supabase
-        .from('client_binder_views')
-        .select('*')
-        .eq('client_binder_id', binderId)
-        .gte('viewed_at', startDate.toISOString())
-        .order('viewed_at', { ascending: true });
-
-      if (viewsError) throw viewsError;
-
-      // Get document access data
-      const { data: docAccess, error: docError } = await supabase
-        .from('client_binder_documents')
+      // Get binder with views and document access
+      const { data, error } = await supabase
+        .from('client_binders')
         .select(`
-          document_id,
-          view_count,
-          download_count,
-          last_accessed_at,
-          documents(name)
+          *,
+          client_binder_views(
+            id,
+            viewed_at,
+            viewer_ip,
+            view_duration
+          ),
+          client_binder_documents(
+            document_id,
+            view_count,
+            download_count,
+            last_accessed_at,
+            documents(name)
+          )
         `)
-        .eq('client_binder_id', binderId);
+        .eq('id', binderId)
+        .eq('user_id', user.id)
+        .single();
 
-      if (docError) throw docError;
+      if (error) {
+        if (error.code === 'PGRST116') {
+          throw new Error('Binder not found or access denied');
+        }
+        throw error;
+      }
 
       // Process analytics data
       const analytics = {
-        totalViews: views.length,
-        uniqueViewers: new Set(views.map(v => v.viewer_ip)).size,
-        averageViewDuration: views.reduce((acc, v) => acc + (v.view_duration || 0), 0) / views.length || 0,
-        viewsByDay: this.groupViewsByDay(views),
-        documentStats: docAccess.map(doc => ({
+        totalViews: data.client_binder_views?.length || 0,
+        viewsByDay: this.groupViewsByDay(data.client_binder_views || []),
+        documentStats: data.client_binder_documents?.map(doc => ({
           documentId: doc.document_id,
-          documentName: doc.documents?.name || 'Unknown',
-          views: doc.view_count,
-          downloads: doc.download_count,
+          documentName: doc.documents?.name,
+          views: doc.view_count || 0,
+          downloads: doc.download_count || 0,
           lastAccessed: doc.last_accessed_at
-        })),
-        recentViews: views.slice(-10).reverse()
+        })) || [],
+        firstViewed: data.client_binder_views?.length > 0 
+          ? new Date(Math.min(...data.client_binder_views.map(v => new Date(v.viewed_at))))
+          : null,
+        lastViewed: data.client_binder_views?.length > 0 
+          ? new Date(Math.max(...data.client_binder_views.map(v => new Date(v.viewed_at))))
+          : null
       };
 
-      return { data: analytics, error: null };
+      return { data: { binder: data, analytics }, error: null };
     } catch (error) {
       console.error('Error fetching binder analytics:', error);
       return { data: null, error };

@@ -1,5 +1,5 @@
-// src/components/client/ClientCoverPage.js
-import React, { useState, useEffect } from 'react';
+// src/components/client/ClientCoverPage.js - Updated with logos at bottom and law firm credit
+import React from 'react';
 
 const ClientCoverPage = ({ binder, logos, onNavigateToTOC }) => {
   const formatDate = () => {
@@ -34,9 +34,15 @@ const ClientCoverPage = ({ binder, logos, onNavigateToTOC }) => {
 
   const transactionDetails = getTransactionDetails();
 
+  // Check all possible photo field combinations
+  const photoUrl = binder?.cover_photo_url || 
+                   binder?.property_photo_url || 
+                   binder?.projects?.cover_photo_url || 
+                   binder?.projects?.property_photo_url;
+
   return (
-    <div className="max-w-4xl mx-auto bg-white" style={{ minHeight: '11in' }}>
-      {/* Header Section */}
+    <div className="max-w-4xl mx-auto bg-white cover-page-container" style={{ minHeight: '11in' }}>
+      {/* Header Section - NO LOGOS HERE NOW */}
       <div className="text-center border-b-2 border-black pb-6 mb-10">
         {/* Main Title */}
         <h1 className="text-4xl font-bold text-black mb-3">
@@ -62,11 +68,11 @@ const ClientCoverPage = ({ binder, logos, onNavigateToTOC }) => {
       </div>
 
       {/* Property Photo Section */}
-      {(binder?.cover_photo_url || binder?.property_photo_url) && (
+      {photoUrl && (
         <div className="mb-10 text-center">
           <div className="inline-block border-2 border-gray-200 p-2 bg-white shadow-lg">
             <img
-              src={binder.cover_photo_url || binder.property_photo_url}
+              src={photoUrl}
               alt="Property"
               className="max-w-full h-auto object-contain"
               style={{ maxWidth: '600px', maxHeight: '400px' }}
@@ -117,77 +123,96 @@ const ClientCoverPage = ({ binder, logos, onNavigateToTOC }) => {
       )}
 
       {/* Transaction Participants Section */}
-      <div className="mb-10 grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="space-y-6">
-          <div className="border-l-4 border-black pl-4">
-            <h3 className="text-lg font-semibold text-black mb-4">Transaction Participants</h3>
-            <div className="space-y-3">
-              {transactionDetails.buyer !== 'Not specified' && (
-                <div>
-                  <span className="font-medium text-gray-900">Buyer:</span>
-                  <span className="ml-2 text-gray-700">{transactionDetails.buyer}</span>
-                </div>
-              )}
-              {transactionDetails.seller !== 'Not specified' && (
-                <div>
-                  <span className="font-medium text-gray-900">Seller:</span>
-                  <span className="ml-2 text-gray-700">{transactionDetails.seller}</span>
-                </div>
-              )}
-              {transactionDetails.attorney !== 'Not specified' && (
-                <div>
-                  <span className="font-medium text-gray-900">Attorney:</span>
-                  <span className="ml-2 text-gray-700">{transactionDetails.attorney}</span>
-                </div>
-              )}
-              {transactionDetails.realEstateAgent !== 'Not specified' && (
-                <div>
-                  <span className="font-medium text-gray-900">Real Estate Agent:</span>
-                  <span className="ml-2 text-gray-700">{transactionDetails.realEstateAgent}</span>
-                </div>
-              )}
+      {(Object.values(transactionDetails).some(detail => detail !== 'Not specified')) && (
+        <div className="mb-10 grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-6">
+            <div className="border-l-4 border-black pl-4">
+              <h3 className="text-lg font-semibold text-black mb-4">Transaction Participants</h3>
+              <div className="space-y-3">
+                {transactionDetails.buyer !== 'Not specified' && (
+                  <div>
+                    <span className="font-medium text-gray-900">Buyer:</span>
+                    <span className="ml-2 text-gray-700">{transactionDetails.buyer}</span>
+                  </div>
+                )}
+                {transactionDetails.seller !== 'Not specified' && (
+                  <div>
+                    <span className="font-medium text-gray-900">Seller:</span>
+                    <span className="ml-2 text-gray-700">{transactionDetails.seller}</span>
+                  </div>
+                )}
+                {transactionDetails.attorney !== 'Not specified' && (
+                  <div>
+                    <span className="font-medium text-gray-900">Attorney:</span>
+                    <span className="ml-2 text-gray-700">{transactionDetails.attorney}</span>
+                  </div>
+                )}
+                {transactionDetails.realEstateAgent !== 'Not specified' && (
+                  <div>
+                    <span className="font-medium text-gray-900">Real Estate Agent:</span>
+                    <span className="ml-2 text-gray-700">{transactionDetails.realEstateAgent}</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="space-y-6">
-          <div className="border-l-4 border-black pl-4">
-            <h3 className="text-lg font-semibold text-black mb-4">Service Providers</h3>
-            <div className="space-y-3">
-              {transactionDetails.lender !== 'Not specified' && (
-                <div>
-                  <span className="font-medium text-gray-900">Lender:</span>
-                  <span className="ml-2 text-gray-700">{transactionDetails.lender}</span>
-                </div>
-              )}
-              {transactionDetails.titleCompany !== 'Not specified' && (
-                <div>
-                  <span className="font-medium text-gray-900">Title Company:</span>
-                  <span className="ml-2 text-gray-700">{transactionDetails.titleCompany}</span>
-                </div>
-              )}
-              {transactionDetails.escrowAgent !== 'Not specified' && (
-                <div>
-                  <span className="font-medium text-gray-900">Escrow Agent:</span>
-                  <span className="ml-2 text-gray-700">{transactionDetails.escrowAgent}</span>
-                </div>
-              )}
+          <div className="space-y-6">
+            <div className="border-l-4 border-black pl-4">
+              <h3 className="text-lg font-semibold text-black mb-4">Service Providers</h3>
+              <div className="space-y-3">
+                {transactionDetails.lender !== 'Not specified' && (
+                  <div>
+                    <span className="font-medium text-gray-900">Lender:</span>
+                    <span className="ml-2 text-gray-700">{transactionDetails.lender}</span>
+                  </div>
+                )}
+                {transactionDetails.titleCompany !== 'Not specified' && (
+                  <div>
+                    <span className="font-medium text-gray-900">Title Company:</span>
+                    <span className="ml-2 text-gray-700">{transactionDetails.titleCompany}</span>
+                  </div>
+                )}
+                {transactionDetails.escrowAgent !== 'Not specified' && (
+                  <div>
+                    <span className="font-medium text-gray-900">Escrow Agent:</span>
+                    <span className="ml-2 text-gray-700">{transactionDetails.escrowAgent}</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Navigation Button */}
+      <div className="text-center mb-10">
+        <button
+          onClick={onNavigateToTOC}
+          className="bg-black text-white px-8 py-4 rounded hover:bg-gray-800 transition-colors text-lg font-medium"
+        >
+          View Table of Contents →
+        </button>
       </div>
 
-      {/* Company Logos Section - Large logos with proper spacing */}
+      {/* Company Logos Section - NOW AT BOTTOM, MUCH BIGGER */}
       <div className="mb-10">
-        <div className="flex justify-center items-center space-x-16">
+        <div className="flex justify-center items-center space-x-12">
           {logos && logos.length > 0 ? (
             logos.slice(0, 3).map((logo, index) => (
-              <div key={logo.id} className="text-center">
+              <div key={logo.id || index} className="text-center">
                 <img
                   src={logo.logo_url}
                   alt={logo.logo_name || `Company Logo ${index + 1}`}
-                  className="w-64 h-64 object-contain mx-auto"
-                  style={{ maxWidth: '250px', maxHeight: '250px', minWidth: '200px', minHeight: '150px' }}
+                  className="max-w-full object-contain mx-auto"
+                  style={{ 
+                    maxWidth: '260px', 
+                    maxHeight: '260px', 
+                    minWidth: '190px', 
+                    minHeight: '150px',
+                    width: 'auto',
+                    height: 'auto'
+                  }}
                   onError={(e) => {
                     e.target.style.display = 'none';
                   }}
@@ -202,24 +227,54 @@ const ClientCoverPage = ({ binder, logos, onNavigateToTOC }) => {
         </div>
       </div>
 
-      {/* Navigation Button */}
-      <div className="text-center mb-10">
-        <button
-          onClick={onNavigateToTOC}
-          className="bg-black text-white px-8 py-4 rounded hover:bg-gray-800 transition-colors text-lg font-medium"
-        >
-          View Table of Contents
-        </button>
+      {/* Law Firm Credit Section */}
+      <div className="text-center mb-8 py-4 bg-gray-50 rounded-lg">
+        <p className="text-sm font-medium text-gray-800">
+          This Closing Binder prepared by Camelback Law Group, LLC
+        </p>
+        <p className="text-sm text-gray-600 mt-1">
+          For more information, contact us at{' '}
+          <a 
+            href="mailto:info@clglawaz.com" 
+            className="text-blue-600 hover:text-blue-800 underline"
+          >
+            info@clglawaz.com
+          </a>
+        </p>
       </div>
 
       {/* Footer */}
-      <div className="border-t-2 border-black pt-6 mt-10 text-center">
+      <div className="border-t-2 border-black pt-6 text-center">
         <p className="text-sm text-gray-600">
           This closing binder contains all documents and materials related to the above transaction.
           <br />
           Please retain for your records.
         </p>
       </div>
+
+      {/* Print Styles */}
+      <style>{`
+        @media print {
+          @page {
+            margin: 0.75in;
+            size: letter;
+          }
+          
+          .cover-page-container {
+            max-width: none !important;
+          }
+          
+          .cover-page-container .shadow-lg {
+            box-shadow: none !important;
+            border: 2px solid #e5e5e5 !important;
+          }
+          
+          body {
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+          }
+        }
+      `}</style>
     </div>
   );
 };
