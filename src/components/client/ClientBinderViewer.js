@@ -24,17 +24,22 @@ const ClientBinderViewer = () => {
       setLoading(true);
       setError(null);
 
-      const result = await ClientDashboardService.getPublishedBinder(accessCode);
+      // Use the corrected getBinderByAccessCode method
+      const result = await ClientDashboardService.getBinderByAccessCode(accessCode);
       
-      if (!result.success) {
-        throw new Error(result.error?.message || 'Failed to load binder');
+      if (result.error) {
+        throw new Error(result.error.message || 'Failed to load binder');
       }
 
-      setBinder(result.binder);
-      setLogos(result.logos || []);
+      if (!result.data) {
+        throw new Error('Binder not found');
+      }
+
+      setBinder(result.data);
+      setLogos(result.data.logos || []);
 
       // Track the view
-      await ClientDashboardService.trackBinderView(result.binder.id, {
+      await ClientDashboardService.trackBinderView(result.data.id, {
         userAgent: navigator.userAgent,
         timestamp: new Date().toISOString()
       });
@@ -160,7 +165,7 @@ const ClientBinderViewer = () => {
 
   // Render current view
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white py-8 px-4">
       {currentView === 'cover' ? (
         <ClientCoverPage
           binder={binder}
