@@ -1,4 +1,4 @@
-// src/components/client/ClientBinderViewer.js
+// src/components/client/ClientBinderViewer.js - Fixed to pass documents to ClientCoverPage
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ClientDashboardService } from '../../services/clientDashboardService';
@@ -57,20 +57,20 @@ const ClientBinderViewer = () => {
       // Track document access
       await ClientDashboardService.trackDocumentAccess(
         binder.id, 
-        documentItem.document_id, 
-        'view'
+        documentItem.id, 
+        'view',
+        {
+          userAgent: navigator.userAgent,
+          timestamp: new Date().toISOString()
+        }
       );
 
-      // Get the document URL
-      const doc = documentItem.documents || documentItem;
-      if (doc.file_url) {
-        // Open in new window/tab
-        window.open(doc.file_url, '_blank', 'noopener,noreferrer');
-      } else {
-        console.error('No file URL available for document');
+      // Open document in new window
+      if (documentItem.url) {
+        window.open(documentItem.url, '_blank');
       }
-    } catch (err) {
-      console.error('Error opening document:', err);
+    } catch (error) {
+      console.error('Error opening document:', error);
     }
   };
 
@@ -79,26 +79,25 @@ const ClientBinderViewer = () => {
       // Track document access
       await ClientDashboardService.trackDocumentAccess(
         binder.id, 
-        documentItem.document_id, 
-        'download'
+        documentItem.id, 
+        'download',
+        {
+          userAgent: navigator.userAgent,
+          timestamp: new Date().toISOString()
+        }
       );
 
-      // Get the document URL
-      const doc = documentItem.documents || documentItem;
-      if (doc.file_url) {
-        // Create download link
+      // Trigger download
+      if (documentItem.url) {
         const link = document.createElement('a');
-        link.href = doc.file_url;
-        link.download = doc.name || 'document.pdf';
-        link.target = '_blank';
+        link.href = documentItem.url;
+        link.download = documentItem.original_name || documentItem.name || 'document.pdf';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-      } else {
-        console.error('No file URL available for document');
       }
-    } catch (err) {
-      console.error('Error downloading document:', err);
+    } catch (error) {
+      console.error('Error downloading document:', error);
     }
   };
 
@@ -114,10 +113,7 @@ const ClientBinderViewer = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="text-center">
-          <LoadingSpinner size="lg" className="mb-4" />
-          <p className="text-gray-600">Loading closing binder...</p>
-        </div>
+        <LoadingSpinner />
       </div>
     );
   }
@@ -163,6 +159,23 @@ const ClientBinderViewer = () => {
     );
   }
 
+  // Extract documents array - this is the key fix!
+  const documents = binder.client_binder_documents || binder.documents || [];
+
+  // Debug logging to help troubleshoot
+  console.log('Binder data:', {
+    binderId: binder.id,
+    title: binder.title,
+    documentCount: documents.length,
+    documentsStructure: documents.map(doc => ({
+      id: doc.id,
+      title: doc.title || doc.name,
+      hasBlob: !!doc.blob,
+      hasStoragePath: !!doc.storage_path,
+      hasUrl: !!doc.url
+    }))
+  });
+
   // Render current view
   return (
     <div className="min-h-screen bg-white py-8 px-4">
@@ -170,12 +183,13 @@ const ClientBinderViewer = () => {
         <ClientCoverPage
           binder={binder}
           logos={logos}
+          documents={documents} // ← This was missing!
           onNavigateToTOC={handleNavigateToTOC}
         />
       ) : (
         <ClientTableOfContents
           binder={binder}
-          documents={binder.client_binder_documents || []}
+          documents={documents}
           logos={logos}
           onNavigateToCover={handleNavigateToCover}
           onOpenDocument={handleOpenDocument}

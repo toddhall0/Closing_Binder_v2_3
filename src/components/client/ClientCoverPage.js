@@ -1,7 +1,10 @@
-// src/components/client/ClientCoverPage.js - Updated with logos at bottom and law firm credit
-import React from 'react';
+// src/components/client/ClientCoverPage.js - Updated with PDF download functionality
+import React, { useState } from 'react';
+import ClientBinderDownloader from './ClientBinderDownloader';
 
-const ClientCoverPage = ({ binder, logos, onNavigateToTOC }) => {
+const ClientCoverPage = ({ binder, logos, onNavigateToTOC, documents = [] }) => {
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+  
   const formatDate = () => {
     return new Date().toLocaleDateString('en-US', {
       year: 'numeric',
@@ -42,6 +45,31 @@ const ClientCoverPage = ({ binder, logos, onNavigateToTOC }) => {
 
   return (
     <div className="max-w-4xl mx-auto bg-white cover-page-container" style={{ minHeight: '11in' }}>
+      {/* Top Navigation Bar with TOC Link and Download Button */}
+      <div className="flex justify-between items-center p-6">
+        {/* Download PDF Button */}
+        <button
+          onClick={() => setShowDownloadModal(true)}
+          className="text-sm text-gray-600 hover:text-black transition-colors duration-200 font-medium flex items-center"
+        >
+          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Download PDF
+        </button>
+
+        {/* Table of Contents Link */}
+        <button
+          onClick={onNavigateToTOC}
+          className="text-sm text-gray-600 hover:text-black transition-colors duration-200 font-medium flex items-center"
+        >
+          Table of Contents
+          <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+
       {/* Header Section - NO LOGOS HERE NOW */}
       <div className="text-center border-b-2 border-black pb-6 mb-10">
         {/* Main Title */}
@@ -185,16 +213,6 @@ const ClientCoverPage = ({ binder, logos, onNavigateToTOC }) => {
         </div>
       )}
 
-      {/* Navigation Button */}
-      <div className="text-center mb-10">
-        <button
-          onClick={onNavigateToTOC}
-          className="bg-black text-white px-8 py-4 rounded hover:bg-gray-800 transition-colors text-lg font-medium"
-        >
-          View Table of Contents →
-        </button>
-      </div>
-
       {/* Company Logos Section - NOW AT BOTTOM, MUCH BIGGER */}
       <div className="mb-10">
         <div className="flex justify-center items-center space-x-12">
@@ -251,6 +269,38 @@ const ClientCoverPage = ({ binder, logos, onNavigateToTOC }) => {
           Please retain for your records.
         </p>
       </div>
+
+      {/* Download Modal */}
+      {showDownloadModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Download Complete Binder
+                </h3>
+                <button
+                  onClick={() => setShowDownloadModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <ClientBinderDownloader
+                binder={binder}
+                documents={documents}
+                logos={logos}
+                onProgress={(progress, step) => {
+                  console.log(`Download progress: ${progress}% - ${step}`);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Print Styles */}
       <style>{`
