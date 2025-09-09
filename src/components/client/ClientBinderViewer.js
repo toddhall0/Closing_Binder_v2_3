@@ -105,9 +105,63 @@ const ClientBinderViewer = () => {
     setCurrentView('toc');
   };
 
+  const ClientContactInfo = () => {
+    const roles = [
+      { key: 'buyer', label: 'Buyer' },
+      { key: 'seller', label: 'Seller' },
+      { key: 'buyer_attorney', label: "Buyer's Attorney" },
+      { key: 'seller_attorney', label: "Seller's Attorney" },
+      { key: 'escrow_agent', label: 'Escrow Agent' },
+      { key: 'title_company', label: 'Title Insurance Company' },
+      { key: 'lender', label: 'Lender' },
+      { key: 'buyer_broker', label: "Buyer's Broker" },
+      { key: 'seller_broker', label: "Seller's Broker" },
+    ];
+    const info = binder?.contact_info || binder?.cover_page_data?.contact_info || {};
+    return (
+      <div className="max-w-4xl mx-auto bg-white p-6">
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold text-black">Contact Information</h1>
+        </div>
+        <div className="space-y-6">
+          {roles.map((role) => {
+            const data = info[role.key] || {};
+            const hasAny = ['company','representative','address','email','phone','web'].some(k => !!data[k]);
+            if (!hasAny) return null;
+            return (
+              <div key={role.key} className="border-l-4 border-black pl-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">{role.label}</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                  {data.company && <div><span className="font-medium">Company:</span> {data.company}</div>}
+                  {data.representative && <div><span className="font-medium">Representative:</span> {data.representative}</div>}
+                  {data.address && <div className="md:col-span-2"><span className="font-medium">Address:</span> {data.address}</div>}
+                  {data.email && <div><span className="font-medium">Email:</span> {data.email}</div>}
+                  {data.phone && <div><span className="font-medium">Phone:</span> {data.phone}</div>}
+                  {data.web && <div className="md:col-span-2"><span className="font-medium">Web:</span> {data.web}</div>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-6 text-left">
+          <button onClick={() => setCurrentView('toc')} className="text-sm text-blue-600 hover:text-blue-800 underline">
+            Back to Table of Contents
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   const handleNavigateToCover = () => {
     setCurrentView('cover');
   };
+
+  // Listen for custom navigation events from child buttons
+  useEffect(() => {
+    const handler = () => setCurrentView('contact');
+    window.addEventListener('navigate-client-contact', handler);
+    return () => window.removeEventListener('navigate-client-contact', handler);
+  }, []);
 
   // Loading state
   if (loading) {
@@ -159,8 +213,41 @@ const ClientBinderViewer = () => {
     );
   }
 
-  // Extract documents array - this is the key fix!
-  const documents = binder.client_binder_documents || binder.documents || [];
+  // Extract and normalize documents into flat list with expected fields
+  const documents = (binder.client_binder_documents || binder.documents || []).map((item) => {
+    // If coming from join: { document_id, is_viewable, is_downloadable, documents: { ...actualDoc } }
+    const doc = item.documents ? item.documents : item;
+    const id = doc.id || item.document_id || item.id;
+    const name = doc.name || doc.original_name || doc.display_name;
+    const display_name = doc.display_name || doc.original_name || doc.name || 'Unnamed Document';
+    const section_id = doc.section_id || item.section_id || null;
+    const storage_path = doc.storage_path || doc.file_path || null;
+    const file_url = doc.file_url || item.url || null;
+
+    // Build a best-effort URL
+    let url = null;
+    if (storage_path) {
+      url = `${process.env.REACT_APP_SUPABASE_URL}/storage/v1/object/public/documents/${storage_path}`;
+    } else if (file_url) {
+      url = file_url;
+    }
+
+    return {
+      ...doc,
+      id,
+      name,
+      display_name,
+      section_id,
+      storage_path,
+      file_url,
+      url
+    };
+  });
+
+  // Build structure for TOC numbering using binder.table_of_contents_data if available
+  const structure = {
+    sections: binder?.table_of_contents_data?.sections || []
+  };
 
   // Debug logging to help troubleshoot
   console.log('Binder data:', {
@@ -178,7 +265,14 @@ const ClientBinderViewer = () => {
 
   // Render current view
   return (
-    <div className="min-h-screen bg-white py-8 px-4">
+    <div className="min-h-screen bg-gray-100 py-8 px-4">
+      {/* lightweight event bridge for deep-link buttons */}
+      <script dangerouslySetInnerHTML={{ __html: `
+        window.addEventListener('navigate-client-contact', function() {
+          var root = document.getElementById('root');
+          // no-op; React state handler below
+        });
+      `}} />
       {currentView === 'cover' ? (
         <ClientCoverPage
           binder={binder}
@@ -186,15 +280,18 @@ const ClientBinderViewer = () => {
           documents={documents} // ← This was missing!
           onNavigateToTOC={handleNavigateToTOC}
         />
-      ) : (
+      ) : currentView === 'toc' ? (
         <ClientTableOfContents
           binder={binder}
           documents={documents}
+          structure={structure}
           logos={logos}
           onNavigateToCover={handleNavigateToCover}
           onOpenDocument={handleOpenDocument}
           onDownloadDocument={handleDownloadDocument}
         />
+      ) : (
+        <ClientContactInfo />
       )}
     </div>
   );

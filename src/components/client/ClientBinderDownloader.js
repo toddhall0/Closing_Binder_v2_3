@@ -143,7 +143,7 @@ const ClientBinderDownloader = ({
       const TableOfContentsPDF = (await import('../pdf/TableOfContentsPDF')).default;
 
       // Step 1: Generate Cover Page PDF
-      updateProgress(15, 'Generating cover page...');
+      updateProgress(12, 'Generating cover page...');
       const coverPageBlob = await pdf(
         React.createElement(CoverPagePDF, {
           project: {
@@ -171,39 +171,44 @@ const ClientBinderDownloader = ({
 
       console.log('Cover page generated:', { size: coverPageBlob.size });
 
-      // Step 2: Generate Table of Contents PDF
-      updateProgress(25, 'Generating table of contents...');
-      
+      // Prepare structure and compute ordered documents matching TOC order
       const structure = {
         sections: binder?.table_of_contents_data?.sections || [],
         documents: documents
       };
 
-      const tocBlob = await pdf(
-        React.createElement(TableOfContentsPDF, {
-          project: {
-            title: binder?.title || 'Closing Binder',
-            property_address: binder?.property_address
-          },
-          structure: structure,
-          logos: logos,
-          generateDocumentUrl: () => null,
-          documentBookmarks: new Map()
-        })
-      ).toBlob();
+      const sectionsSorted = (structure.sections || []).slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      const docsBySection = new Map();
+      for (const doc of documents) {
+        const key = doc.section_id || 'unorganized';
+        if (!docsBySection.has(key)) docsBySection.set(key, []);
+        docsBySection.get(key).push(doc);
+      }
+      for (const [k, list] of docsBySection.entries()) {
+        list.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      }
+      const orderedDocs = [];
+      for (const section of sectionsSorted) {
+        if (section.section_type !== 'section') continue;
+        (docsBySection.get(section.id) || []).forEach(d => orderedDocs.push(d));
+        const subsections = sectionsSorted.filter(s => s.parent_section_id === section.id).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+        for (const sub of subsections) {
+          (docsBySection.get(sub.id) || []).forEach(d => orderedDocs.push(d));
+        }
+      }
+      // Append unorganized at the end
+      (docsBySection.get('unorganized') || []).forEach(d => orderedDocs.push(d));
 
-      console.log('TOC generated:', { size: tocBlob.size });
-
-      // Step 3: FIXED - Load all document PDFs with better error handling
-      updateProgress(35, 'Loading document files...');
+      // Step 2: Load all document PDFs and count pages
+      updateProgress(28, 'Loading document files...');
       const documentPDFs = [];
       
-      console.log(`Processing ${documents.length} documents...`);
+      console.log(`Processing ${orderedDocs.length} documents in TOC order...`);
       
-      for (let i = 0; i < documents.length; i++) {
-        const doc = documents[i];
+      for (let i = 0; i < orderedDocs.length; i++) {
+        const doc = orderedDocs[i];
         const docTitle = doc.title || doc.name || doc.original_name || `Document ${i + 1}`;
-        updateProgress(35 + (i / documents.length) * 30, `Loading ${docTitle}...`);
+        updateProgress(28 + (i / orderedDocs.length) * 22, `Loading ${docTitle}...`);
         
         try {
           const documentBlob = await fetchDocumentBlob(doc);
@@ -213,15 +218,17 @@ const ClientBinderDownloader = ({
             // Test that it's a valid PDF by trying to load it
             try {
               const testArrayBuffer = await documentBlob.arrayBuffer();
-              await PDFDocument.load(testArrayBuffer);
+              const testPdf = await PDFDocument.load(testArrayBuffer);
+              const pageCount = testPdf.getPageIndices().length;
               
               documentPDFs.push({
                 title: docTitle,
                 blob: documentBlob,
-                originalDoc: doc
+                originalDoc: doc,
+                pageCount
               });
               
-              console.log(`Successfully loaded document: ${docTitle} (${documentBlob.size} bytes)`);
+              console.log(`Successfully loaded document: ${docTitle} (${documentBlob.size} bytes, pages: ${pageCount})`);
             } catch (pdfError) {
               console.warn(`Document ${docTitle} is not a valid PDF:`, pdfError);
               // Skip invalid PDFs but don't fail the entire process
@@ -235,13 +242,105 @@ const ClientBinderDownloader = ({
         }
       }
 
-      console.log(`Successfully loaded ${documentPDFs.length} of ${documents.length} documents`);
+      console.log(`Successfully loaded ${documentPDFs.length} of ${orderedDocs.length} documents`);
 
-      if (documentPDFs.length === 0 && documents.length > 0) {
+      if (documentPDFs.length === 0 && orderedDocs.length > 0) {
         throw new Error('Unable to load any documents. Please check that documents are properly uploaded and accessible.');
       }
 
-      // Step 4: FIXED - Merge all PDFs with proper page tracking
+      // Count cover pages
+      const coverArrayBuffer = await coverPageBlob.arrayBuffer();
+      const coverPDF = await PDFDocument.load(coverArrayBuffer);
+      const coverPagesCount = coverPDF.getPageIndices().length;
+
+      // Step 3: Generate a preliminary TOC to determine its page count
+      updateProgress(52, 'Estimating table of contents pages...');
+      const preTocBlob = await pdf(
+        React.createElement(TableOfContentsPDF, {
+          project: {
+            title: binder?.title || 'Closing Binder',
+            property_address: binder?.property_address,
+            purchase_price: binder?.purchase_price,
+            closing_date: binder?.closing_date
+          },
+          structure: {
+            sections: structure.sections,
+            documents: orderedDocs
+          },
+          logos: logos,
+          generateDocumentUrl: (d) => {
+            if (d?.url) return d.url;
+            if (d?.file_url) return d.file_url;
+            if (d?.file_path) {
+              if (/^https?:\/\//i.test(d.file_path)) return d.file_path;
+              const baseUrl = process.env.REACT_APP_SUPABASE_URL;
+              return `${baseUrl}/storage/v1/object/public/documents/${String(d.file_path).replace(/^documents\//, '')}`;
+            }
+            return null;
+          },
+          documentBookmarks: new Map()
+        })
+      ).toBlob();
+
+      const preTocArrayBuffer = await preTocBlob.arrayBuffer();
+      const preTocPdf = await PDFDocument.load(preTocArrayBuffer);
+      const preTocPagesCount = preTocPdf.getPageIndices().length;
+
+      // Compute first page numbers for each document based on cover + preTOC pages
+      let runningPage = coverPagesCount + preTocPagesCount + 1; // 1-based page numbering
+      const pageNumberById = new Map();
+      for (const doc of orderedDocs) {
+        const found = documentPDFs.find(d => d.originalDoc.id === doc.id);
+        if (found) {
+          pageNumberById.set(doc.id, runningPage);
+          runningPage += found.pageCount;
+        }
+      }
+
+      // Step 4: Generate final TOC with computed page numbers
+      updateProgress(60, 'Generating table of contents...');
+      const finalTocBlob = await pdf(
+        React.createElement(TableOfContentsPDF, {
+          project: {
+            title: binder?.title || 'Closing Binder',
+            property_address: binder?.property_address,
+            purchase_price: binder?.purchase_price,
+            closing_date: binder?.closing_date
+          },
+          structure: {
+            sections: structure.sections,
+            documents: orderedDocs.map(d => ({ ...d, pageNumber: pageNumberById.get(d.id) || null }))
+          },
+          logos: logos,
+          generateDocumentUrl: (d) => {
+            if (d?.url) return d.url;
+            if (d?.file_url) return d.file_url;
+            if (d?.file_path) {
+              if (/^https?:\/\//i.test(d.file_path)) return d.file_path;
+              const baseUrl = process.env.REACT_APP_SUPABASE_URL;
+              return `${baseUrl}/storage/v1/object/public/documents/${String(d.file_path).replace(/^documents\//, '')}`;
+            }
+            return null;
+          },
+          documentBookmarks: new Map()
+        })
+      ).toBlob();
+
+      console.log('TOC generated:', { size: finalTocBlob.size });
+
+      // Step 5: Generate Contact Information page
+      updateProgress(66, 'Generating contact information page...');
+      const ContactInfoPDF = (await import('../pdf/ContactInfoPDF')).default;
+      const contactBlob = await pdf(
+        React.createElement(ContactInfoPDF, {
+          project: {
+            ...binder,
+            contact_info: binder?.contact_info || binder?.cover_page_data?.contact_info || {}
+          }
+        })
+      ).toBlob();
+
+      // Step 6: Merge all PDFs with proper page tracking in TOC order
       updateProgress(70, 'Merging all documents...');
       
       const mergedPDF = await PDFDocument.create();
@@ -251,8 +350,6 @@ const ClientBinderDownloader = ({
       // Add cover page
       if (coverPageBlob) {
         updateProgress(72, 'Adding cover page...');
-        const coverArrayBuffer = await coverPageBlob.arrayBuffer();
-        const coverPDF = await PDFDocument.load(coverArrayBuffer);
         const coverPages = await mergedPDF.copyPages(coverPDF, coverPDF.getPageIndices());
         
         coverPages.forEach(page => {
@@ -265,9 +362,9 @@ const ClientBinderDownloader = ({
       }
 
       // Add table of contents
-      if (tocBlob) {
+      if (finalTocBlob) {
         updateProgress(75, 'Adding table of contents...');
-        const tocArrayBuffer = await tocBlob.arrayBuffer();
+        const tocArrayBuffer = await finalTocBlob.arrayBuffer();
         const tocPDF = await PDFDocument.load(tocArrayBuffer);
         const tocPages = await mergedPDF.copyPages(tocPDF, tocPDF.getPageIndices());
         
@@ -279,6 +376,20 @@ const ClientBinderDownloader = ({
         
         bookmarks.push({ title: 'Table of Contents', pageNumber: tocStartPage });
         console.log('Added table of contents');
+      }
+
+      // Add contact information page
+      if (contactBlob) {
+        updateProgress(77, 'Adding contact information page...');
+        const ciArrayBuffer = await contactBlob.arrayBuffer();
+        const ciPDF = await PDFDocument.load(ciArrayBuffer);
+        const ciPages = await mergedPDF.copyPages(ciPDF, ciPDF.getPageIndices());
+        const ciStart = currentPageNum;
+        ciPages.forEach(page => {
+          mergedPDF.addPage(page);
+          currentPageNum++;
+        });
+        bookmarks.push({ title: 'Contact Information', pageNumber: ciStart });
       }
 
       // FIXED - Add all documents with proper error handling

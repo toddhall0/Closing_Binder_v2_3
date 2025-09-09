@@ -9,29 +9,16 @@ import { Document, Page, Text, View, StyleSheet, Image, Link } from '@react-pdf/
 const styles = StyleSheet.create({
   page: {
     backgroundColor: '#FFFFFF',
-    padding: 72,
+    paddingTop: 56,
+    paddingHorizontal: 56,
+    paddingBottom: 56,
     fontFamily: 'Helvetica',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 40,
-    paddingBottom: 20,
-    borderBottom: '2px solid #000000',
-  },
-  logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 15,
-  },
-  logo: {
-    maxWidth: 60,
-    maxHeight: 45,
-    objectFit: 'contain',
+    marginBottom: 24,
   },
   headerInfo: {
-    textAlign: 'right',
+    textAlign: 'center',
   },
   projectTitle: {
     fontSize: 16,
@@ -44,14 +31,33 @@ const styles = StyleSheet.create({
     color: '#4A4A4A',
   },
   tocTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#000000',
     textAlign: 'center',
-    marginBottom: 40,
+    marginBottom: 12,
+  },
+  projectMeta: {
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  projectTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#111111',
+    marginBottom: 6,
+  },
+  projectAddress: {
+    fontSize: 12,
+    color: '#4A4A4A',
+    marginBottom: 4,
+  },
+  projectDetails: {
+    fontSize: 10,
+    color: '#666666',
   },
   sectionContainer: {
-    marginBottom: 20,
+    marginBottom: 12,
   },
   sectionHeader: {
     fontSize: 14,
@@ -62,8 +68,8 @@ const styles = StyleSheet.create({
     borderBottom: '1px solid #F5F5F5',
   },
   subsectionContainer: {
-    marginLeft: 20,
-    marginBottom: 15,
+    marginLeft: 16,
+    marginBottom: 10,
   },
   subsectionHeader: {
     fontSize: 12,
@@ -73,29 +79,34 @@ const styles = StyleSheet.create({
   },
   documentRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 3,
-    paddingHorizontal: 5,
   },
   documentRowSubsection: {
-    marginLeft: 40,
+    marginLeft: 36,
   },
-  documentName: {
+  docNumberCell: {
+    fontSize: 11,
+    color: '#666666',
+    minWidth: 36,
+    width: 36,
+  },
+  docNameCell: {
     fontSize: 11,
     color: '#000000',
-    flex: 1,
+    flexGrow: 1,
+    marginLeft: 8,
+    marginRight: 12,
   },
-  documentNameLink: {
+  docNameLink: {
     fontSize: 11,
     color: '#0066CC',
-    flex: 1,
     textDecoration: 'underline',
   },
-  documentNumber: {
+  docPageCell: {
     fontSize: 11,
     color: '#4A4A4A',
-    minWidth: 30,
+    minWidth: 44,
     textAlign: 'right',
   },
   unorganizedSection: {
@@ -105,27 +116,41 @@ const styles = StyleSheet.create({
   },
   footer: {
     position: 'absolute',
-    bottom: 72,
-    left: 72,
-    right: 72,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    bottom: 30,
+    left: 56,
+    right: 56,
+    textAlign: 'center',
     paddingTop: 10,
-    borderTop: '1px solid #F5F5F5',
-    fontSize: 9,
+    borderTop: '2 solid #000000',
+    fontSize: 10,
     color: '#4A4A4A',
+  },
+  bottomLogos: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderTop: '2 solid #000000',
+    position: 'absolute',
+    left: 56,
+    right: 56,
+    bottom: 70,
+  },
+  logo: {
+    maxWidth: 180,
+    maxHeight: 90,
+    objectFit: 'contain',
   },
   instructionBox: {
     backgroundColor: '#F5F5F5',
-    padding: 15,
-    marginBottom: 20,
+    padding: 10,
+    marginBottom: 16,
     borderRadius: 4,
   },
   instructionText: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#4A4A4A',
-    lineHeight: 1.4,
+    lineHeight: 1.3,
     textAlign: 'center',
   }
 });
@@ -150,8 +175,9 @@ const TableOfContentsPDF = ({
     let sectionNumber = 1;
     let documentNumber = 1;
 
-    // Process sections
-    structure.sections.forEach((section) => {
+    // Process sections in sort order
+    const sectionsSorted = [...structure.sections].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+    sectionsSorted.forEach((section) => {
       if (section.section_type === 'section') {
         numbered.sections[section.id] = {
           ...section,
@@ -162,9 +188,10 @@ const TableOfContentsPDF = ({
 
         let subsectionNumber = 1;
         
-        // Process subsections
-        structure.sections
+        // Process subsections in sort order
+        sectionsSorted
           .filter(sub => sub.parent_section_id === section.id)
+          .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
           .forEach((subsection) => {
             numbered.sections[section.id].subsections[subsection.id] = {
               ...subsection,
@@ -175,15 +202,15 @@ const TableOfContentsPDF = ({
       }
     });
 
-    // Process documents with page references from documentBookmarks
-    structure.documents.forEach((doc) => {
+    // Process documents with page references from documentBookmarks in sort order
+    const docsSorted = [...structure.documents].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+    docsSorted.forEach((doc) => {
       // Try to get page number from bookmarks created by PDF merger
-      const docName = doc.original_name || doc.name;
+      const docName = doc.original_name || doc.name || doc.display_name;
       const pageNumber = documentBookmarks.get(docName)?.pageNumber || null;
       
       const docWithNumber = {
         ...doc,
-        number: documentNumber++,
         url: generateDocumentUrl ? generateDocumentUrl(doc) : null,
         // Use page number from PDF merger if available
         pageNumber: pageNumber
@@ -206,6 +233,29 @@ const TableOfContentsPDF = ({
       }
     });
 
+    // Assign hierarchical numbers matching client UI
+    Object.values(numbered.sections).forEach((section) => {
+      // Section documents: 1.1, 1.2, ...
+      section.documents = section.documents.map((d, i) => ({
+        ...d,
+        number: `${section.number}.${i + 1}`
+      }));
+      // Subsection documents: 1.1.1, 1.1.2, ...
+      Object.values(section.subsections).forEach((sub) => {
+        sub.documents = sub.documents.map((d, i) => ({
+          ...d,
+          number: `${sub.number}.${i + 1}`
+        }));
+      });
+    });
+
+    // Unorganized numbering like client: sequential after main sections
+    const mainSectionsCount = sectionsSorted.filter(s => s.section_type === 'section').length;
+    numbered.unorganized = numbered.unorganized.map((d, i) => ({
+      ...d,
+      number: `${mainSectionsCount + i + 1}`
+    }));
+
     return numbered;
   };
 
@@ -227,7 +277,7 @@ const TableOfContentsPDF = ({
       ));
   };
 
-  // Document rendering with external links (since internal PDF links don't work reliably)
+  // Document rendering in UI-like format: "1.1 [tab] Name" with optional page number
   const renderDocument = (doc, isSubsection = false) => {
     return (
       <View 
@@ -237,24 +287,17 @@ const TableOfContentsPDF = ({
           isSubsection && styles.documentRowSubsection
         ]}
       >
-        {/* Document name - make it look like a link but show page reference */}
-        {doc.url ? (
-          <Link 
-            src={doc.url}
-            style={styles.documentNameLink}
-          >
-            <Text>{doc.original_name || doc.name}</Text>
-          </Link>
-        ) : (
-          <Text style={styles.documentNameLink}>
-            {doc.original_name || doc.name}
-          </Text>
-        )}
-        
-        {/* Show page number if available */}
-        <Text style={styles.documentNumber}>
-          {doc.pageNumber ? `Page ${doc.pageNumber}` : `Doc ${doc.number}`}
-        </Text>
+        <Text style={styles.docNumberCell}>{doc.number}</Text>
+        <View style={styles.docNameCell}>
+          {doc.url ? (
+            <Link src={doc.url} style={styles.docNameLink}>
+              <Text>{doc.display_name || doc.original_name || doc.name}</Text>
+            </Link>
+          ) : (
+            <Text>{doc.display_name || doc.original_name || doc.name}</Text>
+          )}
+        </View>
+        <Text style={styles.docPageCell}>{doc.pageNumber ? `Page ${doc.pageNumber}` : ''}</Text>
       </View>
     );
   };
@@ -272,31 +315,20 @@ const TableOfContentsPDF = ({
 
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            {renderLogos()}
-          </View>
-          
-          <View style={styles.headerInfo}>
-            <Text style={styles.projectTitle}>
-              {project?.title || 'Closing Binder'}
-            </Text>
-            {project?.property_address && (
-              <Text style={styles.projectAddress}>
-                {project.property_address}
-              </Text>
+          <Text style={styles.tocTitle}>TABLE OF CONTENTS</Text>
+          <View style={styles.projectMeta}>
+            {!!project?.title && (
+              <Text style={styles.projectTitle}>{project.title}</Text>
             )}
+            {!!project?.property_address && (
+              <Text style={styles.projectAddress}>{project.property_address}</Text>
+            )}
+            <Text style={styles.projectDetails}>
+              {!!project?.purchase_price && `Purchase Price: $${Number(project.purchase_price).toLocaleString()}`}
+              {!!project?.purchase_price && !!project?.closing_date && '  •  '}
+              {!!project?.closing_date && `Closing Date: ${new Date(project.closing_date).toLocaleDateString()}`}
+            </Text>
           </View>
-        </View>
-
-        {/* Title */}
-        <Text style={styles.tocTitle}>Table of Contents</Text>
-
-        {/* Instructions */}
-        <View style={styles.instructionBox}>
-          <Text style={styles.instructionText}>
-            Click on document names to navigate directly to that document. 
-            Each document contains a "Back to TOC" link in the top-right corner to return here.
-          </Text>
         </View>
 
         {/* Organized Sections */}
@@ -329,10 +361,17 @@ const TableOfContentsPDF = ({
           </View>
         )}
 
-        {/* Footer */}
+        {/* Bottom logos and footer */}
+        {logos && logos.length > 0 && (
+          <View style={styles.bottomLogos}>
+            {renderLogos()}
+          </View>
+        )}
         <View style={styles.footer}>
-          <Text>Table of Contents</Text>
-          <Text>Generated: {new Date().toLocaleDateString()}</Text>
+          <Text>
+            <Text style={{ fontWeight: 'bold' }}>Generated:</Text> {new Date().toLocaleDateString()}
+          </Text>
+          <Text>This table of contents provides quick access to all documents in your closing binder.</Text>
         </View>
       </Page>
     </Document>

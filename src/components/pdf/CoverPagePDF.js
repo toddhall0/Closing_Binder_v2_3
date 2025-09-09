@@ -11,35 +11,43 @@ const styles = StyleSheet.create({
   page: {
     flexDirection: 'column',
     backgroundColor: '#FFFFFF',
-    padding: 40,
+    paddingTop: 36,
+    paddingHorizontal: 36,
+    paddingBottom: 36,
     fontFamily: 'Helvetica'
   },
   header: {
-    marginBottom: 30,
+    marginBottom: 16,
     textAlign: 'center',
     borderBottom: '2 solid #000000',
-    paddingBottom: 20
+    paddingBottom: 12
+  },
+  propertyDetailsText: {
+    fontSize: 11,
+    color: '#555555',
+    textAlign: 'center',
+    lineHeight: 1.3
   },
   title: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: 'bold',
     color: '#000000',
-    marginBottom: 10,
+    marginBottom: 6,
     fontFamily: 'Helvetica-Bold'
   },
   propertyAddress: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#4A4A4A',
-    marginBottom: 5
+    marginBottom: 4
   },
   photoSection: {
     alignItems: 'center',
-    marginVertical: 20,
-    minHeight: 250
+    marginVertical: 14,
+    minHeight: 220
   },
   propertyPhoto: {
-    width: 400,
-    height: 250,
+    width: 380,
+    height: 220,
     objectFit: 'cover',
     border: '1 solid #E5E5E5'
   },
@@ -58,9 +66,9 @@ const styles = StyleSheet.create({
     lineHeight: 1.5
   },
   descriptionSection: {
-    marginVertical: 20,
+    marginVertical: 12,
     backgroundColor: '#FAFAFA',
-    padding: 15,
+    padding: 10,
     border: '1 solid #E5E5E5'
   },
   descriptionTitle: {
@@ -71,14 +79,41 @@ const styles = StyleSheet.create({
     fontFamily: 'Helvetica-Bold'
   },
   descriptionText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#555555',
     lineHeight: 1.4,
     textAlign: 'center'
   },
+  highlightsRow: {
+    marginTop: 10,
+    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16
+  },
+  highlightBox: {
+    backgroundColor: '#F8F8F8',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    border: '1 solid #E5E5E5',
+    borderRadius: 4,
+    minWidth: 160,
+    alignItems: 'center'
+  },
+  highlightLabel: {
+    fontSize: 10,
+    color: '#666666',
+    fontWeight: 'bold'
+  },
+  highlightValue: {
+    fontSize: 14,
+    color: '#111111',
+    fontWeight: 'bold',
+    marginTop: 2
+  },
   transactionDetails: {
-    marginTop: 20,
-    padding: 15,
+    marginTop: 12,
+    padding: 10,
     backgroundColor: '#F8F8F8'
   },
   transactionGrid: {
@@ -88,7 +123,7 @@ const styles = StyleSheet.create({
   },
   transactionItem: {
     width: '48%',
-    marginBottom: 8
+    marginBottom: 6
   },
   transactionLabel: {
     fontSize: 10,
@@ -102,24 +137,29 @@ const styles = StyleSheet.create({
     marginTop: 2
   },
   purchasePrice: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#000000',
     textAlign: 'center',
-    marginVertical: 15,
+    marginVertical: 10,
     fontFamily: 'Helvetica-Bold'
   },
   logoContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    marginTop: 30,
-    borderTop: '1 solid #E5E5E5',
-    paddingTop: 20
+    marginTop: 24,
+    paddingVertical: 16,
+    borderTop: '2 solid #000000',
+    borderBottom: '2 solid #000000',
+    position: 'absolute',
+    left: 36,
+    right: 36,
+    bottom: 48
   },
   logo: {
-    maxWidth: 120,
-    maxHeight: 60,
+    maxWidth: 180,
+    maxHeight: 90,
     objectFit: 'contain'
   },
   footer: {
@@ -250,10 +290,15 @@ const CoverPagePDF = ({
           <Text style={styles.title}>
             {mergedData.title}
           </Text>
+          {/* Keep only one location line below title - propertyAddress used here once */}
           {mergedData.propertyAddress && (
-            <Text style={styles.propertyAddress}>
-              {mergedData.propertyAddress}
-            </Text>
+            <Text style={styles.propertyAddress}>{mergedData.propertyAddress}</Text>
+          )}
+          {/* Only location and brief description under title */}
+          {mergedData.propertyDescription && (
+            <View>
+              <Text style={styles.propertyDetailsText}>{mergedData.propertyDescription}</Text>
+            </View>
           )}
         </View>
 
@@ -272,19 +317,24 @@ const CoverPagePDF = ({
           )}
         </View>
 
-        {/* Property Description */}
-        {mergedData.propertyDescription && (
-          <View style={styles.descriptionSection}>
-            <Text style={styles.descriptionTitle}>Property Description</Text>
-            {renderDescription(mergedData.propertyDescription)}
-          </View>
-        )}
+        {/* Property Description removed per request */}
 
-        {/* Purchase Price (prominently displayed) */}
-        {formattedPurchasePrice && (
-          <Text style={styles.purchasePrice}>
-            Purchase Price: {formattedPurchasePrice}
-          </Text>
+        {/* Highlights row to mirror client UI: purchase price + closing date under photo */}
+        {(formattedPurchasePrice || mergedData.closingDate) && (
+          <View style={styles.highlightsRow}>
+            {formattedPurchasePrice && (
+              <View style={styles.highlightBox}>
+                <Text style={styles.highlightLabel}>Purchase Price</Text>
+                <Text style={styles.highlightValue}>{formattedPurchasePrice}</Text>
+              </View>
+            )}
+            {mergedData.closingDate && (
+              <View style={styles.highlightBox}>
+                <Text style={styles.highlightLabel}>Closing Date</Text>
+                <Text style={styles.highlightValue}>{formatDate(mergedData.closingDate)}</Text>
+              </View>
+            )}
+          </View>
         )}
 
         {/* Transaction Details Grid */}
@@ -334,10 +384,14 @@ const CoverPagePDF = ({
           <View style={styles.logoContainer}>
             {safeLogos.map((logo, index) => {
               const logoUrl = logo?.url || logo?.logo_url;
-              return renderSafeImage(
-                logoUrl,
-                styles.logo,
-                null // No placeholder for logos
+              return (
+                <View key={logo?.id || index}>
+                  {renderSafeImage(
+                    logoUrl,
+                    styles.logo,
+                    null
+                  )}
+                </View>
               );
             })}
           </View>

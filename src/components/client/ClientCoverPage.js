@@ -238,9 +238,10 @@ const ClientCoverPage = ({ binder, logos, onNavigateToTOC, documents = [] }) => 
           </div>
         </div>
 
-        {/* Company Logos - FIXED: 25% larger */}
+        {/* Company Logos with black lines above and below */}
         {displayLogos.length > 0 && (
           <div className="mb-8">
+            <div className="border-t-2 border-black mb-4"></div>
             <div className="flex justify-center items-center space-x-8">
               {displayLogos.map((logo, index) => {
                 const logoUrl = logo?.url || logo?.logo_url || logo?.image_url;
@@ -249,7 +250,8 @@ const ClientCoverPage = ({ binder, logos, onNavigateToTOC, documents = [] }) => 
                     key={index}
                     src={logoUrl}
                     alt={`Company logo ${index + 1}`}
-                    className="h-20 max-w-40 object-contain" // FIXED: 25% larger (was h-16 max-w-32)
+                    className="w-auto object-contain"
+                    style={{ height: '120px' }}
                     onError={(e) => {
                       console.warn(`Failed to load logo ${index + 1}:`, logoUrl);
                       e.target.style.display = 'none';
@@ -258,6 +260,7 @@ const ClientCoverPage = ({ binder, logos, onNavigateToTOC, documents = [] }) => 
                 );
               })}
             </div>
+            <div className="border-b-2 border-black mt-4"></div>
           </div>
         )}
 

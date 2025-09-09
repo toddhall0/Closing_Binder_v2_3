@@ -38,7 +38,8 @@ const PublishBinderButton = ({ project, documents, sections, logos }) => {
       lender: project?.lender || '',
       titleCompany: project?.title_company || '',
       escrowAgent: project?.escrow_agent || '',
-      propertyPhotoUrl: project?.property_photo_url || project?.cover_photo_url || ''
+      propertyPhotoUrl: project?.property_photo_url || project?.cover_photo_url || '',
+      contact_info: project?.contact_info || {}
     };
   };
 

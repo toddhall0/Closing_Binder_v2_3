@@ -187,6 +187,7 @@ static async getBinderByAccessCode(accessCode, password = null) {
           documents(
             id,
             name,
+            section_id,
             file_url,
             file_path,
             file_size,
