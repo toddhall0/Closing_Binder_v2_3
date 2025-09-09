@@ -1,6 +1,6 @@
 // ===============================
 // FILE: src/components/projects/GenerateBinder.js
-// Updated to use HybridBinderGenerator
+// FIXED VERSION - Removed "Complete Binder" tab only
 // ===============================
 
 import React, { useState } from 'react';
@@ -9,12 +9,12 @@ import { FileText, Download, Settings, Globe } from 'lucide-react';
 // Import components
 import CoverPageEditor from '../pdf/CoverPageEditor';
 import TableOfContentsGenerator from '../pdf/TableOfContentsGenerator';
-import CompleteBinderGenerator from '../pdf/CompleteBinderGenerator';
 import HybridBinderGenerator from '../HybridBinderGenerator';
 
 const GenerateBinder = ({ project, onProjectUpdate }) => {
   const [activeSection, setActiveSection] = useState('hybrid');
 
+  // FIXED: Removed the "complete" section from the array
   const sections = [
     {
       id: 'hybrid',
@@ -36,16 +36,14 @@ const GenerateBinder = ({ project, onProjectUpdate }) => {
       icon: Settings,
       component: TableOfContentsGenerator,
       description: 'Generate table of contents'
-    },
-    {
-      id: 'complete',
-      name: 'Complete Binder',
-      icon: Download,
-      component: CompleteBinderGenerator,
-      description: 'Generate complete PDF binder'
     }
+    
   ];
 
+// ADD THIS LINE TO TEST:
+  console.log('GenerateBinder sections:', sections.map(s => s.name));
+
+  
   const ActiveComponent = sections.find(s => s.id === activeSection)?.component;
 
   return (

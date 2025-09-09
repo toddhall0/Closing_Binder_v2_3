@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
+  Download, 
   FileText, 
   AlertCircle, 
   Settings, 
@@ -25,7 +26,7 @@ const CompleteBinderGenerator = ({ project }) => {
     error,
     estimatedSize,
     canCancel,
-    // cancelled,
+    cancelled,
     options,
     generateCompleteBinding,
     cancelGeneration,

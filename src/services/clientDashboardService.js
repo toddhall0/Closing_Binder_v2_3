@@ -169,100 +169,100 @@ export class ClientDashboardService {
    * @param {string} password - Optional password for protected binders
    * @returns {Promise<{data: Object|null, error: Error|null}>}
    */
-  static async getBinderByAccessCode(accessCode, password = null) {
-    try {
-      let query = supabase
-        .from('client_binders')
-        .select(`
-          *,
-          projects(
-            *
-          ),
-          client_binder_documents(
-            document_id,
-            is_downloadable,
-            is_viewable,
-            documents(
-              id,
-              name,
-              file_url,
-              file_path,
-              file_size,
-              sort_order
-            )
+  // Replace your getBinderByAccessCode method in clientDashboardService.js with this FIXED version:
+
+static async getBinderByAccessCode(accessCode, password = null) {
+  try {
+    let query = supabase
+      .from('client_binders')
+      .select(`
+        *,
+        projects(
+          *
+        ),
+        client_binder_documents(
+          document_id,
+          is_downloadable,
+          is_viewable,
+          documents(
+            id,
+            name,
+            file_url,
+            file_path,
+            file_size,
+            sort_order
           )
-        `)
-        .eq('access_code', accessCode)
-        .eq('is_published', true)
-        .eq('is_active', true);
+        )
+      `)
+      .eq('access_code', accessCode)
+      .eq('is_published', true)
+      .eq('is_active', true);
 
-      // Check if binder has expired
-      query = query.or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
+    // Check if binder has expired
+    query = query.or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
 
-      const { data, error } = await query.single();
+    const { data, error } = await query.single();
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          return { data: null, error: new Error('Invalid access code or binder not available') };
-        }
-        throw error;
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return { data: null, error: new Error('Invalid access code or binder not available') };
       }
-
-      // Check password if binder is password protected
-      if (data.password_protected && data.access_password) {
-        if (!password || password !== data.access_password) {
-          return { data: null, error: new Error('Password required or incorrect') };
-        }
-      }
-
-      // IMPORTANT: Merge project data with binder data
-      // This ensures all project fields are available to the client components
-      const enrichedData = {
-        ...data,
-        // Use binder data first, fall back to project data
-        title: data.title || data.projects?.title,
-        property_address: data.property_address || data.projects?.property_address,
-        property_description: data.property_description || data.projects?.property_description,
-        cover_photo_url: data.cover_photo_url || data.projects?.cover_photo_url,
-        city: data.city || data.projects?.city,
-        state: data.state || data.projects?.state,
-        zip_code: data.zip_code || data.projects?.zip_code,
-        // Add any other project fields you need
-        buyer: data.buyer || data.projects?.buyer,
-        seller: data.seller || data.projects?.seller,
-        attorney: data.attorney || data.projects?.attorney,
-        lender: data.lender || data.projects?.lender,
-        escrow_agent: data.escrow_agent || data.projects?.escrow_agent,
-        title_company: data.title_company || data.projects?.title_company,
-        real_estate_agent: data.real_estate_agent || data.projects?.real_estate_agent,
-      };
-
-      // Also fetch logos for this project
-      try {
-        const { data: logosData, error: logosError } = await supabase
-          .from('logos')
-          .select('*')
-          .eq('project_id', data.project_id)
-          .order('logo_position');
-
-        if (!logosError && logosData) {
-          enrichedData.logos = logosData;
-        }
-      } catch (logosError) {
-        console.log('Error fetching logos (non-critical):', logosError);
-      }
-
-      // Track the view
-      await this.trackBinderView(data.id);
-
-      console.log('Enriched binder data:', enrichedData);
-      
-      return { data: enrichedData, error: null };
-    } catch (error) {
-      console.error('Error fetching binder by access code:', error);
-      return { data: null, error };
+      throw error;
     }
+
+    // Check password if binder is password protected
+    if (data.password_protected && data.access_password) {
+      if (!password || password !== data.access_password) {
+        return { data: null, error: new Error('Password required or incorrect') };
+      }
+    }
+
+    // FIXED: Properly flatten and merge the project data
+    const projectData = data.projects || {};
+    
+    const enrichedData = {
+      ...data,
+      // Flatten all project fields to top level
+      ...projectData,
+      // Override with binder-specific data if it exists
+      title: data.title || projectData.title,
+      property_address: data.property_address || projectData.property_address,
+      property_description: data.property_description || projectData.property_description,
+      
+      // Ensure photo fields are properly mapped
+      cover_photo_url: data.cover_photo_url || projectData.cover_photo_url || projectData.property_photo_url,
+      property_photo_url: data.property_photo_url || projectData.property_photo_url || projectData.cover_photo_url,
+      
+      // Keep the projects object for debugging
+      projects: projectData
+    };
+
+    // Also fetch logos for this project
+    try {
+      const { data: logosData, error: logosError } = await supabase
+        .from('logos')
+        .select('*')
+        .eq('project_id', data.project_id)
+        .order('logo_position');
+
+      if (!logosError && logosData) {
+        enrichedData.logos = logosData;
+      }
+    } catch (logosError) {
+      console.log('Error fetching logos (non-critical):', logosError);
+    }
+
+    // Track the view
+    await this.trackBinderView(data.id);
+
+    console.log('Enriched binder data:', enrichedData);
+    
+    return { data: enrichedData, error: null };
+  } catch (error) {
+    console.error('Error fetching binder by access code:', error);
+    return { data: null, error };
   }
+}
 
   /**
    * Update published binder settings

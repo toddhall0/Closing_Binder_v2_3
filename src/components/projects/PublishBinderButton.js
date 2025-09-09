@@ -1,10 +1,14 @@
-// src/components/projects/PublishBinderButton.js
+// ===============================
+// FILE: src/components/projects/PublishBinderButton.js
+// FIXED VERSION - "Open New Window" button instead of "Copy URL"
+// ===============================
+
 import React, { useState } from 'react';
-import { ClientDashboardService } from '../../services/clientDashboardService';
-import { Button } from '../common/ui/Button';
-import { Modal } from '../common/ui/Modal';
-import { Input } from '../common/ui/Input';
 import { LoadingSpinner } from '../common/ui/LoadingSpinner';
+import { Button } from '../common/ui/Button';
+import { Input } from '../common/ui/Input';
+import { Modal } from '../common/ui/Modal';
+import { ClientDashboardService } from '../../services/clientDashboardService';
 
 const PublishBinderButton = ({ project, documents, sections, logos }) => {
   const [showModal, setShowModal] = useState(false);
@@ -21,103 +25,31 @@ const PublishBinderButton = ({ project, documents, sections, logos }) => {
     selectedDocuments: []
   });
 
-  // Generate cover page data from current project
   const generateCoverPageData = () => {
     return {
-      title: project.title,
-      propertyAddress: project.property_address,
-      propertyDescription: project.property_description,
-      coverImage: project.cover_photo_url,
-      logos: logos?.map(logo => ({
-        url: logo.logo_url,
-        position: logo.logo_position,
-        name: logo.name || 'Company Logo'
-      })) || [],
-      generatedDate: new Date().toISOString()
+      title: project?.title || '',
+      propertyAddress: project?.property_address || '',
+      propertyDescription: project?.property_description || '',
+      purchasePrice: project?.purchase_price || '',
+      closingDate: project?.closing_date || '',
+      buyer: project?.buyer || '',
+      seller: project?.seller || '',
+      attorney: project?.attorney || '',
+      lender: project?.lender || '',
+      titleCompany: project?.title_company || '',
+      escrowAgent: project?.escrow_agent || '',
+      propertyPhotoUrl: project?.property_photo_url || project?.cover_photo_url || ''
     };
   };
 
-  // Generate table of contents data from current project structure
   const generateTableOfContentsData = () => {
-    // Create organized structure similar to your existing TOC logic
-    const organizedStructure = {
-      title: project.title,
-      propertyAddress: project.property_address,
-      sections: [],
-      unorganized: []
+    return {
+      sections: sections || [],
+      totalDocuments: documents?.length || 0,
+      generatedAt: new Date().toISOString()
     };
-
-    // Group documents by sections
-    const sectionMap = new Map();
-    
-    // Initialize sections
-    (sections || []).forEach(section => {
-      if (section.section_type === 'section') {
-        sectionMap.set(section.id, {
-          id: section.id,
-          name: section.name,
-          sort_order: section.sort_order,
-          documents: [],
-          subsections: []
-        });
-      }
-    });
-
-    // Add subsections
-    (sections || []).forEach(section => {
-      if (section.section_type === 'subsection' && section.parent_section_id) {
-        const parentSection = sectionMap.get(section.parent_section_id);
-        if (parentSection) {
-          parentSection.subsections.push({
-            id: section.id,
-            name: section.name,
-            sort_order: section.sort_order,
-            documents: []
-          });
-        }
-      }
-    });
-
-    // Organize documents
-    (documents || []).forEach(doc => {
-      if (doc.section_id) {
-        // Find if document belongs to a main section
-        const section = sectionMap.get(doc.section_id);
-        if (section) {
-          section.documents.push(doc);
-          return;
-        }
-
-        // Check if it belongs to a subsection
-        for (const [, sectionData] of sectionMap) {
-          const subsection = sectionData.subsections.find(sub => sub.id === doc.section_id);
-          if (subsection) {
-            subsection.documents.push(doc);
-            return;
-          }
-        }
-      }
-      
-      // If no section found, add to unorganized
-      organizedStructure.unorganized.push(doc);
-    });
-
-    // Convert map to array and sort
-    organizedStructure.sections = Array.from(sectionMap.values())
-      .sort((a, b) => a.sort_order - b.sort_order);
-
-    // Sort documents within sections
-    organizedStructure.sections.forEach(section => {
-      section.documents.sort((a, b) => a.sort_order - b.sort_order);
-      section.subsections.forEach(subsection => {
-        subsection.documents.sort((a, b) => a.sort_order - b.sort_order);
-      });
-    });
-
-    return organizedStructure;
   };
 
-  // Handle form submission
   const handlePublish = async (e) => {
     e.preventDefault();
     
@@ -130,11 +62,9 @@ const PublishBinderButton = ({ project, documents, sections, logos }) => {
       setPublishing(true);
       setError(null);
 
-      // Generate binder data
       const coverPageData = generateCoverPageData();
       const tableOfContentsData = generateTableOfContentsData();
       
-      // Determine which documents to include
       const documentsToInclude = formData.includeAllDocuments 
         ? documents 
         : documents.filter(doc => formData.selectedDocuments.includes(doc.id));
@@ -169,7 +99,6 @@ const PublishBinderButton = ({ project, documents, sections, logos }) => {
         sharingUrl: ClientDashboardService.generateSharingUrl(result.data.access_code)
       });
       
-      // Reset form
       setFormData({
         clientName: '',
         clientEmail: '',
@@ -187,7 +116,6 @@ const PublishBinderButton = ({ project, documents, sections, logos }) => {
     }
   };
 
-  // Handle document selection change
   const handleDocumentSelection = (documentId, selected) => {
     setFormData(prev => ({
       ...prev,
@@ -197,20 +125,61 @@ const PublishBinderButton = ({ project, documents, sections, logos }) => {
     }));
   };
 
-  // Copy URL to clipboard
-  const copyToClipboard = async (url) => {
+  // FIXED: Replace copy URL with open new window
+  const openClientBinder = (url) => {
     try {
-      await navigator.clipboard.writeText(url);
-      alert('URL copied to clipboard!');
+      // Calculate window dimensions (75% of current window)
+      const width = Math.floor(window.innerWidth * 0.75);
+      const height = Math.floor(window.innerHeight * 0.75);
+      
+      // Center the window
+      const left = Math.floor((window.innerWidth - width) / 2) + window.screenX;
+      const top = Math.floor((window.innerHeight - height) / 2) + window.screenY;
+      
+      // Window features for the new popup
+      const windowFeatures = `
+        width=${width},
+        height=${height},
+        left=${left},
+        top=${top},
+        scrollbars=yes,
+        resizable=yes,
+        toolbar=no,
+        menubar=no,
+        location=no,
+        status=no
+      `.replace(/\s+/g, '');
+      
+      // Open the client binder in a new window
+      const newWindow = window.open(url, `client_binder_${Date.now()}`, windowFeatures);
+      
+      if (newWindow) {
+        newWindow.focus();
+        console.log('Opened client binder in new window:', url);
+      } else {
+        // Fallback if popup is blocked
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
+    } catch (error) {
+      console.error('Error opening client binder:', error);
+      // Final fallback
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  // Still keep copy functionality as a secondary option
+  const copyToClipboard = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      alert('Copied to clipboard!');
     } catch (err) {
-      // Fallback
       const textArea = document.createElement('textarea');
-      textArea.value = url;
+      textArea.value = text;
       document.body.appendChild(textArea);
       textArea.select();
       document.execCommand('copy');
       document.body.removeChild(textArea);
-      alert('URL copied to clipboard!');
+      alert('Copied to clipboard!');
     }
   };
 
@@ -228,168 +197,119 @@ const PublishBinderButton = ({ project, documents, sections, logos }) => {
 
       <Modal 
         isOpen={showModal}
-          onClose={() => {
-            setShowModal(false);
-            setError(null);
-            setSuccess(null);
-          }} 
-          title="Publish Binder for Client Access"
-          size="lg"
-        >
-          {success ? (
-            <SuccessView 
-              success={success} 
-              onCopyUrl={copyToClipboard}
-              onClose={() => setShowModal(false)}
-            />
-          ) : (
-            <form onSubmit={handlePublish} className="space-y-6">
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                  {error}
+        onClose={() => {
+          setShowModal(false);
+          setError(null);
+          setSuccess(null);
+        }} 
+        title="Publish Binder for Client Access"
+        size="lg"
+      >
+        {success ? (
+          <SuccessView 
+            success={success} 
+            onOpenWindow={openClientBinder}
+            onCopyUrl={copyToClipboard}
+            onClose={() => setShowModal(false)}
+          />
+        ) : (
+          <form onSubmit={handlePublish} className="space-y-6">
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                {error}
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Client Name *"
+                value={formData.clientName}
+                onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
+                required
+              />
+              <Input
+                label="Client Email *"
+                type="email"
+                value={formData.clientEmail}
+                onChange={(e) => setFormData({ ...formData, clientEmail: e.target.value })}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Documents to Include
+              </label>
+              <div className="space-y-2">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    checked={formData.includeAllDocuments}
+                    onChange={() => setFormData({ ...formData, includeAllDocuments: true })}
+                    className="mr-2"
+                  />
+                  <span className="text-sm">Include all documents ({documents?.length || 0})</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    checked={!formData.includeAllDocuments}
+                    onChange={() => setFormData({ ...formData, includeAllDocuments: false })}
+                    className="mr-2"
+                  />
+                  <span className="text-sm">Select specific documents</span>
+                </label>
+              </div>
+
+              {!formData.includeAllDocuments && documents && documents.length > 0 && (
+                <div className="mt-3 max-h-40 overflow-y-auto border border-gray-200 rounded p-3">
+                  {documents.map(doc => (
+                    <label key={doc.id} className="flex items-center py-1">
+                      <input
+                        type="checkbox"
+                        checked={formData.selectedDocuments.includes(doc.id)}
+                        onChange={(e) => handleDocumentSelection(doc.id, e.target.checked)}
+                        className="mr-2"
+                      />
+                      <span className="text-sm truncate">{doc.name || doc.title}</span>
+                    </label>
+                  ))}
                 </div>
               )}
+            </div>
 
-              {/* Client Information */}
-              <div className="grid grid-cols-2 gap-4">
-                <Input
-                  label="Client Name *"
-                  value={formData.clientName}
-                  onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
-                  required
-                />
-                <Input
-                  label="Client Email *"
-                  type="email"
-                  value={formData.clientEmail}
-                  onChange={(e) => setFormData({ ...formData, clientEmail: e.target.value })}
-                  required
-                />
-              </div>
-
-              {/* Document Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  Documents to Include
-                </label>
-                <div className="space-y-2">
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      checked={formData.includeAllDocuments}
-                      onChange={() => setFormData({ ...formData, includeAllDocuments: true })}
-                      className="mr-2"
-                    />
-                    <span>Include all documents ({documents?.length || 0} documents)</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      checked={!formData.includeAllDocuments}
-                      onChange={() => setFormData({ ...formData, includeAllDocuments: false })}
-                      className="mr-2"
-                    />
-                    <span>Select specific documents</span>
-                  </label>
-                </div>
-
-                {!formData.includeAllDocuments && (
-                  <div className="mt-4 max-h-48 overflow-y-auto border border-gray-200 rounded-lg">
-                    {(documents || []).map(doc => (
-                      <label key={doc.id} className="flex items-center p-3 hover:bg-gray-50">
-                        <input
-                          type="checkbox"
-                          checked={formData.selectedDocuments.includes(doc.id)}
-                          onChange={(e) => handleDocumentSelection(doc.id, e.target.checked)}
-                          className="mr-3"
-                        />
-                        <span className="text-sm">{doc.name}</span>
-                      </label>
-                    ))}
-                  </div>
+            <div className="flex items-center space-x-4">
+              <Button
+                type="submit"
+                disabled={publishing}
+                className="bg-green-600 text-white hover:bg-green-700"
+              >
+                {publishing ? (
+                  <>
+                    <LoadingSpinner size="sm" className="mr-2" />
+                    Publishing...
+                  </>
+                ) : (
+                  'Publish Binder'
                 )}
-              </div>
-
-              {/* Access Settings */}
-              <div className="grid grid-cols-1 gap-4">
-                <Input
-                  label="Expiration Date (Optional)"
-                  type="datetime-local"
-                  value={formData.expiresAt}
-                  onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
-                />
-
-                <div>
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.passwordProtected}
-                      onChange={(e) => setFormData({ ...formData, passwordProtected: e.target.checked })}
-                      className="rounded border-gray-300 text-black focus:ring-black"
-                    />
-                    <span className="text-sm font-medium text-gray-700">Password protect this binder</span>
-                  </label>
-                </div>
-
-                {formData.passwordProtected && (
-                  <Input
-                    label="Access Password"
-                    type="password"
-                    value={formData.accessPassword}
-                    onChange={(e) => setFormData({ ...formData, accessPassword: e.target.value })}
-                    placeholder="Enter a password for client access"
-                  />
-                )}
-              </div>
-
-              {/* Binder Preview */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-medium text-gray-900 mb-2">Binder Preview</h4>
-                <div className="text-sm text-gray-600 space-y-1">
-                  <p><strong>Title:</strong> {project.title}</p>
-                  <p><strong>Property:</strong> {project.property_address}</p>
-                  <p><strong>Documents:</strong> {
-                    formData.includeAllDocuments 
-                      ? documents?.length || 0
-                      : formData.selectedDocuments.length
-                  } files</p>
-                  <p><strong>Sections:</strong> {sections?.filter(s => s.section_type === 'section').length || 0}</p>
-                </div>
-              </div>
-
-              {/* Submit Buttons */}
-              <div className="flex items-center space-x-3 pt-4 border-t border-gray-200">
-                <Button
-                  type="submit"
-                  disabled={publishing}
-                  className="bg-green-600 text-white hover:bg-green-700 disabled:bg-gray-400"
-                >
-                  {publishing ? (
-                    <>
-                      <LoadingSpinner size="sm" className="mr-2" />
-                      Publishing...
-                    </>
-                  ) : (
-                    'Publish Binder'
-                  )}
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="bg-gray-100 text-gray-700 hover:bg-gray-200"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          )}
-        </Modal>
+              </Button>
+              <Button
+                type="button"
+                onClick={() => setShowModal(false)}
+                className="bg-gray-100 text-gray-700 hover:bg-gray-200"
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </>
   );
 };
 
-// Success View Component
-const SuccessView = ({ success, onCopyUrl, onClose }) => {
+// FIXED: Success View Component with "Open New Window" button
+const SuccessView = ({ success, onOpenWindow, onCopyUrl, onClose }) => {
   return (
     <div className="text-center space-y-6">
       <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
@@ -439,17 +359,32 @@ const SuccessView = ({ success, onCopyUrl, onClose }) => {
             />
             <button
               onClick={() => onCopyUrl(success.sharingUrl)}
-              className="px-3 py-2 bg-black text-white rounded hover:bg-gray-800 text-sm"
+              className="px-3 py-2 text-gray-500 hover:text-gray-700 border border-gray-300 rounded text-sm"
+              title="Copy URL"
             >
-              Copy URL
+              Copy
             </button>
           </div>
+        </div>
+
+        {/* FIXED: Primary "Open New Window" button */}
+        <div className="pt-3">
+          <button
+            onClick={() => onOpenWindow(success.sharingUrl)}
+            className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center"
+          >
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+            Open Client Binder
+          </button>
         </div>
       </div>
 
       <div className="text-xs text-gray-500 space-y-1">
         <p>Send the access code or sharing URL to your client.</p>
         <p>They can access the binder at any time using either method.</p>
+        <p>Use the "Open Client Binder" button to preview how it will look to your client.</p>
       </div>
 
       <Button

@@ -1,16 +1,16 @@
 // ===============================
 // FILE: src/components/HybridBinderGenerator.js
-// Hybrid binder generator with WORKING PDF generation
+// FINAL WORKING VERSION with Enhanced PDF and Working Web Binder
 // ===============================
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Globe, FileText, RefreshCw, Download } from 'lucide-react';
+import { Globe, FileText, RefreshCw, Download, CheckCircle } from 'lucide-react';
 import { documentOrganizationService } from '../utils/documentOrganizationService';
 import CoverPageHTML from './web/CoverPageHTML';
 import TableOfContentsHTML from './web/TableOfContentsHTML';
 
 const HybridBinderGenerator = ({ project, onProjectUpdate }) => {
-  const [mode, setMode] = useState('web');
+  const [mode, setMode] = useState('web'); // Start with web mode
   const [documents, setDocuments] = useState([]);
   const [structure, setStructure] = useState({ sections: [], documents: [] });
   const [loading, setLoading] = useState(false);
@@ -44,8 +44,6 @@ const HybridBinderGenerator = ({ project, onProjectUpdate }) => {
     }
   }, [project?.id, loadDocuments]);
 
-  
-
   const handleGenerateWeb = () => {
     console.log('handleGenerateWeb called with:', {
       documents: documents.length,
@@ -63,7 +61,7 @@ const HybridBinderGenerator = ({ project, onProjectUpdate }) => {
   };
 
   const handleGeneratePDF = async () => {
-    console.log('Starting PDF generation...');
+    console.log('Starting ENHANCED PDF generation...');
     setLoading(true);
     setError(null);
     
@@ -72,8 +70,8 @@ const HybridBinderGenerator = ({ project, onProjectUpdate }) => {
         throw new Error('No documents found. Please upload documents first.');
       }
 
-      // Import the PDF generator
-      const { generatePDFBinder } = await import('../utils/pdfBinderGenerator');
+      // Import the ENHANCED PDF generator (THIS IS THE KEY CHANGE!)
+      const { generateEnhancedPDFBinder } = await import('../utils/enhancedPdfBinderGenerator');
       
       // Load logos for PDF generation
       const { supabase } = await import('../lib/supabase');
@@ -87,15 +85,15 @@ const HybridBinderGenerator = ({ project, onProjectUpdate }) => {
         console.error('Error loading logos for PDF:', logosError);
       }
 
-      console.log('Generating PDF with data:', {
+      console.log('Generating ENHANCED PDF with data:', {
         project: project?.title,
         documents: documents.length,
         sections: structure.sections.length,
         logos: logosData?.length || 0
       });
 
-      // Generate the complete PDF binder
-      const result = await generatePDFBinder({
+      // Generate the ENHANCED PDF binder with better TOC
+      const result = await generateEnhancedPDFBinder({
         project,
         documents,
         structure,
@@ -112,7 +110,7 @@ const HybridBinderGenerator = ({ project, onProjectUpdate }) => {
       
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${project?.title || 'Closing Binder'}.pdf`;
+      link.download = `${project?.title || 'Enhanced Closing Binder'}.pdf`;
       document.body.appendChild(link);
       link.click();
       
@@ -120,10 +118,10 @@ const HybridBinderGenerator = ({ project, onProjectUpdate }) => {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       
-      console.log('PDF generated and downloaded successfully');
+      console.log('ENHANCED PDF generated and downloaded successfully');
 
     } catch (err) {
-      console.error('Error generating PDF:', err);
+      console.error('Error generating ENHANCED PDF:', err);
       setError(`Failed to generate PDF: ${err.message}`);
     } finally {
       setLoading(false);
@@ -152,7 +150,7 @@ const HybridBinderGenerator = ({ project, onProjectUpdate }) => {
         }`}
       >
         <FileText className="h-4 w-4 mr-2" />
-        PDF Binder
+        Enhanced PDF
       </button>
       <button
         onClick={loadDocuments}
@@ -215,8 +213,23 @@ const HybridBinderGenerator = ({ project, onProjectUpdate }) => {
       );
     }
 
+    // Show the actual web binder when generated
     return (
       <div className="space-y-8">
+        {/* Success Header */}
+        <div className="text-center py-4">
+          <div className="flex items-center justify-center mb-4">
+            <CheckCircle className="h-8 w-8 text-green-500 mr-2" />
+            <h3 className="text-lg font-medium text-gray-900">Web Binder Generated Successfully!</h3>
+          </div>
+          <button
+            onClick={() => setGeneratedWeb(false)}
+            className="text-sm text-gray-600 hover:text-gray-900 underline"
+          >
+            ← Back to generate options
+          </button>
+        </div>
+
         {/* Cover Page */}
         <div className="bg-white border border-gray-200 rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
@@ -244,28 +257,14 @@ const HybridBinderGenerator = ({ project, onProjectUpdate }) => {
               Print
             </button>
           </div>
-          <TableOfContentsHTML 
-            project={project}
-            documents={documents}
-            structure={structure}
-          />
-        </div>
-
-        {/* Instructions */}
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <h4 className="font-medium text-green-900 mb-2">✓ Web Binder Generated</h4>
-          <ul className="text-sm text-green-800 space-y-1">
-            <li>• Professional cover page with property details</li>
-            <li>• Interactive table of contents with document links</li>
-            <li>• Documents open in new tabs for easy viewing</li>
-            <li>• Print-ready format for physical binders</li>
-          </ul>
-          <button
-            onClick={() => setGeneratedWeb(false)}
-            className="mt-3 text-sm text-green-700 hover:text-green-900 underline"
-          >
-            ← Back to generate options
-          </button>
+          {/* Use the fixed TableOfContentsHTML component */}
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <TableOfContentsHTML 
+              project={project}
+              documents={documents}
+              structure={structure}
+            />
+          </div>
         </div>
       </div>
     );
@@ -275,10 +274,10 @@ const HybridBinderGenerator = ({ project, onProjectUpdate }) => {
     <div className="text-center py-12">
       <FileText className="h-16 w-16 mx-auto text-gray-400 mb-4" />
       <h3 className="text-lg font-medium text-gray-900 mb-2">
-        Generate Complete PDF Binder
+        Generate Enhanced PDF Binder
       </h3>
       <p className="text-gray-600 mb-6">
-        Create a single PDF with cover page, table of contents, and all documents with bookmarks
+        Create a professional PDF with enhanced table of contents, clickable links, and improved formatting
       </p>
       
       {error && (
@@ -286,6 +285,21 @@ const HybridBinderGenerator = ({ project, onProjectUpdate }) => {
           <p className="text-red-800 text-sm">{error}</p>
         </div>
       )}
+
+      {/* Enhanced PDF Features */}
+      <div className="mb-6">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-lg mx-auto">
+          <h4 className="font-medium text-blue-900 mb-2">Enhanced PDF Features</h4>
+          <ul className="text-sm text-blue-800 space-y-1 text-left">
+            <li>• Professional cover page with property photos and logos</li>
+            <li>• Enhanced table of contents with better formatting</li>
+            <li>• Clickable document links that open in new windows</li>
+            <li>• Professional typography and legal/financial formatting</li>
+            <li>• Proper hierarchical document organization</li>
+            <li>• Dotted lines and page numbers like Complete Binder Generator</li>
+          </ul>
+        </div>
+      </div>
       
       <button
         onClick={handleGeneratePDF}
@@ -295,18 +309,19 @@ const HybridBinderGenerator = ({ project, onProjectUpdate }) => {
         {loading ? (
           <>
             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-            Generating PDF...
+            Generating Enhanced PDF...
           </>
         ) : (
           <>
             <FileText className="h-5 w-5 mr-2" />
-            Generate PDF Binder
+            Generate Enhanced PDF Binder
           </>
         )}
       </button>
 
       {loading && (
         <div className="mt-4 text-sm text-gray-600">
+          <p>Creating enhanced PDF with improved formatting...</p>
           <p>This may take a few minutes for large binders...</p>
           <p>Please keep this tab open during generation.</p>
         </div>
@@ -320,24 +335,29 @@ const HybridBinderGenerator = ({ project, onProjectUpdate }) => {
       <div>
         <h2 className="text-xl font-semibold text-gray-900">Generate Closing Binder</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Choose between interactive web format or downloadable PDF
+          Choose between interactive web format or enhanced PDF with improved table of contents
         </p>
       </div>
 
       <ModeSelector />
       <DocumentStats />
 
-      {loading ? (
-        <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading documents...</p>
-        </div>
-      ) : (
-        <>
-          {mode === 'web' && <WebBinderContent />}
-          {mode === 'pdf' && <PdfBinderContent />}
-        </>
-      )}
+      {/* Content based on mode */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black mx-auto mb-4"></div>
+            <p className="text-gray-600">
+              {mode === 'web' ? 'Loading web binder...' : 'Generating enhanced PDF...'}
+            </p>
+          </div>
+        ) : (
+          <>
+            {mode === 'web' && <WebBinderContent />}
+            {mode === 'pdf' && <PdfBinderContent />}
+          </>
+        )}
+      </div>
     </div>
   );
 };

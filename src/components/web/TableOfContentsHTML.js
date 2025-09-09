@@ -1,7 +1,5 @@
-// ===============================
-// FILE: src/components/web/TableOfContentsHTML.js
-// Interactive HTML Table of Contents - FIXED VERSION
-// ===============================
+// Fixed TableOfContentsHTML Component
+// File: src/components/web/TableOfContentsHTML.js
 
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { ExternalLink } from 'lucide-react';
@@ -38,8 +36,7 @@ const TableOfContentsHTML = ({ project, documents, structure }) => {
     loadLogos();
   }, [project?.id, loadLogos]);
 
-
-  // Create numbered structure for display
+  // Create numbered structure directly without calling organizeDocuments
   const numberedStructure = useMemo(() => {
     console.log('Creating numbered structure with:', {
       documents: documents.length,
@@ -52,65 +49,49 @@ const TableOfContentsHTML = ({ project, documents, structure }) => {
     };
 
     // Group sections by type and parent
-    const sections = structure.sections.filter(s => s.section_type === 'section').sort((a, b) => a.sort_order - b.sort_order);
-    const subsections = structure.sections.filter(s => s.section_type === 'subsection').sort((a, b) => a.sort_order - b.sort_order);
+    const sections = structure.sections.filter(s => s.section_type === 'section').sort((a, b) => 
+      (a.sort_order || 0) - (b.sort_order || 0)
+    );
+    
+    const subsections = structure.sections.filter(s => s.section_type === 'subsection').sort((a, b) => 
+      (a.sort_order || 0) - (b.sort_order || 0)
+    );
 
-    // Create numbered sections
-    sections.forEach((section, index) => {
-      const sectionNumber = index + 1;
+    // Create section objects with documents
+    sections.forEach((section, sectionIndex) => {
+      const sectionNumber = sectionIndex + 1;
+      
       result.sections[section.id] = {
         ...section,
         number: sectionNumber,
-        documents: [],
+        documents: documents.filter(doc => doc.section_id === section.id).map((doc, docIndex) => ({
+          ...doc,
+          number: `${sectionNumber}.${docIndex + 1}`
+        })),
         subsections: {}
       };
 
-      // Add subsections to their parent sections
+      // Add subsections to this section
       const sectionSubsections = subsections.filter(sub => sub.parent_section_id === section.id);
       sectionSubsections.forEach((subsection, subIndex) => {
         const subsectionNumber = `${sectionNumber}.${subIndex + 1}`;
+        
         result.sections[section.id].subsections[subsection.id] = {
           ...subsection,
           number: subsectionNumber,
-          documents: []
+          documents: documents.filter(doc => doc.section_id === subsection.id).map((doc, docIndex) => ({
+            ...doc,
+            number: `${subsectionNumber}.${docIndex + 1}`
+          }))
         };
       });
     });
 
-    // Assign documents to their sections/subsections with numbering
-    documents.forEach(doc => {
-      if (!doc.section_id) {
-        // Unorganized document
-        result.unorganized.push({
-          ...doc,
-          number: result.unorganized.length + 1
-        });
-      } else {
-        // Find which section/subsection this document belongs to
-        const section = result.sections[doc.section_id];
-        if (section) {
-          // Document belongs to a main section
-          const docNumber = `${section.number}.${section.documents.length + 1}`;
-          section.documents.push({
-            ...doc,
-            number: docNumber
-          });
-        } else {
-          // Check if it belongs to a subsection
-          for (const sectionId of Object.keys(result.sections)) {
-            const subsection = result.sections[sectionId].subsections[doc.section_id];
-            if (subsection) {
-              const docNumber = `${subsection.number}.${subsection.documents.length + 1}`;
-              subsection.documents.push({
-                ...doc,
-                number: docNumber
-              });
-              break;
-            }
-          }
-        }
-      }
-    });
+    // Add unorganized documents
+    result.unorganized = documents.filter(doc => !doc.section_id).map((doc, index) => ({
+      ...doc,
+      number: `${sections.length + index + 1}`
+    }));
 
     console.log('Numbered structure created:', result);
     return result;
@@ -125,7 +106,7 @@ const TableOfContentsHTML = ({ project, documents, structure }) => {
     minute: '2-digit'
   });
 
-  // Open document in new tab - FIXED VERSION
+  // Open document in new tab
   const openDocument = (doc) => {
     console.log('Opening document:', doc);
     
@@ -158,7 +139,7 @@ const TableOfContentsHTML = ({ project, documents, structure }) => {
           {doc.number}
         </span>
         <span className="text-sm font-medium text-gray-900">
-          {doc.original_name || doc.name}
+          {doc.original_name || doc.name || doc.display_name || 'Unnamed Document'}
         </span>
       </div>
       <button
@@ -179,50 +160,65 @@ const TableOfContentsHTML = ({ project, documents, structure }) => {
       <h3 className={`font-semibold text-gray-900 ${
         level === 1 ? 'text-lg' : 'text-base'
       }`}>
-        {section.number}. {section.name}
+        {section.number}. {section.section_name || section.name || 'Unnamed Section'}
       </h3>
     </div>
   );
 
   return (
-    <div className="max-w-4xl mx-auto bg-white toc-container">
-      {/* Header */}
-      <div className="text-center border-b-2 border-black pb-6 mb-8">
-        {/* Company Logos - FIXED VERSION WITH PROPER NULL CHECKS */}
-        {logos && logos.length > 0 && (
-          <div className="flex justify-center items-center space-x-8 mb-6">
-            {logos.slice(0, 3).map((logo) => (
-              <img
-                key={logo.id}
-                src={logo.logo_url}
-                alt={logo.logo_name || `Company Logo`}
-                className="max-h-12 max-w-24 object-contain"
-              />
+    <div className="max-w-4xl mx-auto bg-white p-6">
+      {/* Header with Logos */}
+      {logos.length > 0 && (
+        <div className="text-center mb-8 border-b border-gray-200 pb-6">
+          <div className="flex justify-center items-center space-x-8 mb-4">
+            {logos.slice(0, 3).map((logo, index) => (
+              <div key={logo.id || index} className="flex-shrink-0">
+                <img
+                  src={logo.logo_url}
+                  alt={`Company Logo ${index + 1}`}
+                  className="h-12 w-auto object-contain"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
+              </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Table of Contents Title */}
+      <div className="text-center mb-8">
+        <h1 className="text-3xl font-bold text-black mb-4">TABLE OF CONTENTS</h1>
+        
+        {/* Project Title */}
+        {project?.title && (
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            {project.title}
+          </h2>
+        )}
+        
+        {/* Property Address */}
+        {project?.property_address && (
+          <p className="text-lg text-gray-600 mb-2">
+            {project.property_address}
+          </p>
         )}
 
-        <h1 className="text-3xl font-bold text-black mb-2">
-          TABLE OF CONTENTS
-        </h1>
-        
-        <div className="text-lg text-gray-700 mb-2">
-          {project?.title || 'Closing Binder'}
+        {/* Purchase Price and Closing Date */}
+        <div className="text-sm text-gray-600 space-y-1">
+          {project?.purchase_price && (
+            <p>Purchase Price: ${project.purchase_price.toLocaleString()}</p>
+          )}
+          {project?.closing_date && (
+            <p>Closing Date: {new Date(project.closing_date).toLocaleDateString()}</p>
+          )}
         </div>
-        
-        {project?.property_address && (
-          <div className="text-base text-gray-600">
-            {project.property_address}
-            {project.city && `, ${project.city}`}
-            {project.state && `, ${project.state}`}
-            {project.zip_code && ` ${project.zip_code}`}
-          </div>
-        )}
       </div>
 
       {/* Document Structure */}
       <div className="border border-gray-200 rounded-lg overflow-hidden">
-        {Object.values(numberedStructure.sections).length === 0 && numberedStructure.unorganized.length === 0 ? (
+        {documents.length === 0 ? (
           <div className="text-center py-12">
             <div className="text-gray-400 mb-4">
               {/* File icon SVG */}
@@ -290,33 +286,6 @@ const TableOfContentsHTML = ({ project, documents, structure }) => {
           </p>
         </div>
       </div>
-
-      {/* Print Styles - FIXED VERSION */}
-      <style>{`
-        @media print {
-          @page {
-            margin: 0.75in;
-            size: letter;
-          }
-          
-          .toc-container {
-            max-width: none !important;
-          }
-          
-          .toc-container button {
-            display: none !important;
-          }
-          
-          .toc-container .hover\\:bg-gray-50:hover {
-            background-color: transparent !important;
-          }
-          
-          body {
-            print-color-adjust: exact;
-            -webkit-print-color-adjust: exact;
-          }
-        }
-      `}</style>
     </div>
   );
 };

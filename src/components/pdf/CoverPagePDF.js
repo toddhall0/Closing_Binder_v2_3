@@ -1,211 +1,188 @@
 // ===============================
 // FILE: src/components/pdf/CoverPagePDF.js
-// Fixed version - condensed details section and proper price formatting
+// FIXED VERSION - Properly includes property images
 // ===============================
 
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 
-// Create professional styles matching your design
+// Professional styling for cover page
 const styles = StyleSheet.create({
   page: {
     flexDirection: 'column',
     backgroundColor: '#FFFFFF',
-    padding: 72, // 1 inch margins
-    fontFamily: 'Helvetica',
+    padding: 40,
+    fontFamily: 'Helvetica'
   },
-  
-  // Header Section
   header: {
-    marginBottom: 40,
-    alignItems: 'center',
+    marginBottom: 30,
+    textAlign: 'center',
+    borderBottom: '2 solid #000000',
+    paddingBottom: 20
   },
-  
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#000000',
-    textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 10,
+    fontFamily: 'Helvetica-Bold'
   },
-  
   propertyAddress: {
     fontSize: 16,
     color: '#4A4A4A',
-    textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 5
   },
-  
-  // Main Photo Section
   photoSection: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginVertical: 20,
+    minHeight: 250
   },
-  
+  propertyPhoto: {
+    width: 400,
+    height: 250,
+    objectFit: 'cover',
+    border: '1 solid #E5E5E5'
+  },
   photoPlaceholder: {
     width: 400,
     height: 250,
     backgroundColor: '#F5F5F5',
-    border: '2 solid #4A4A4A',
+    border: '2 dashed #CCCCCC',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'center'
   },
-  
   photoPlaceholderText: {
     fontSize: 14,
-    color: '#4A4A4A',
+    color: '#999999',
     textAlign: 'center',
+    lineHeight: 1.5
   },
-  
-  // Property Description Section - CONDENSED
   descriptionSection: {
-    marginBottom: 10, // Reduced from 15 to 10
-    alignItems: 'center',
+    marginVertical: 20,
+    backgroundColor: '#FAFAFA',
+    padding: 15,
+    border: '1 solid #E5E5E5'
   },
-  
   descriptionTitle: {
-    fontSize: 12, // Reduced from 14 to 12
+    fontSize: 14,
     fontWeight: 'bold',
-    color: '#000000',
-    marginBottom: 6, // Reduced from 10 to 6
-    textAlign: 'center',
+    marginBottom: 8,
+    color: '#333333',
+    fontFamily: 'Helvetica-Bold'
   },
-  
   descriptionText: {
-    fontSize: 10, // Reduced from 12 to 10
-    color: '#4A4A4A',
-    lineHeight: 1.4, // Reduced from 1.5 to 1.4
-    textAlign: 'center',
+    fontSize: 12,
+    color: '#555555',
+    lineHeight: 1.4,
+    textAlign: 'center'
   },
-  
-  // Purchase Price Section - CONDENSED
-  priceSection: {
-    alignItems: 'center',
-    marginBottom: 10, // Reduced from 15 to 10
+  transactionDetails: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: '#F8F8F8'
   },
-  
-  priceText: {
-    fontSize: 18, // Reduced from 20 to 18
-    fontWeight: 'bold',
-    color: '#000000',
-  },
-  
-  // Transaction Details Grid - CONDENSED
-  detailsSection: {
-    marginBottom: 30, // Reduced from 60 to 30 to give logos more room
-  },
-  
-  detailsGrid: {
+  transactionGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     flexWrap: 'wrap',
+    justifyContent: 'space-between'
   },
-  
-  detailColumn: {
+  transactionItem: {
     width: '48%',
+    marginBottom: 8
   },
-  
-  detailRow: {
-    flexDirection: 'row',
-    marginBottom: 6, // Reduced from 8 to 6
+  transactionLabel: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#333333',
+    fontFamily: 'Helvetica-Bold'
   },
-  
-  detailLabel: {
-    fontSize: 10, // Reduced from 11 to 10
+  transactionValue: {
+    fontSize: 11,
+    color: '#555555',
+    marginTop: 2
+  },
+  purchasePrice: {
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#000000',
-    width: 70, // Reduced from 80 to 70
+    textAlign: 'center',
+    marginVertical: 15,
+    fontFamily: 'Helvetica-Bold'
   },
-  
-  detailValue: {
-    fontSize: 10, // Reduced from 11 to 10
-    color: '#4A4A4A',
-    flex: 1,
-  },
-  
-  // Logo Section - ADJUSTED POSITIONING
-  logoSection: {
-    position: 'absolute',
-    bottom: 30, // Moved down further for larger logos
-    left: 60,
-    right: 60,
+  logoContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    height: 120, // Increased for larger logos
+    marginTop: 30,
+    borderTop: '1 solid #E5E5E5',
+    paddingTop: 20
   },
-  
-  logoPlaceholder: {
-    width: 160, // Much larger
-    height: 100,  // Much larger
-    backgroundColor: '#F5F5F5',
-    border: '1 solid #4A4A4A',
-    alignItems: 'center',
-    justifyContent: 'center',
+  logo: {
+    maxWidth: 120,
+    maxHeight: 60,
+    objectFit: 'contain'
   },
-  
-  logoPlaceholderText: {
-    fontSize: 8,
-    color: '#4A4A4A',
-  },
+  footer: {
+    position: 'absolute',
+    bottom: 30,
+    left: 40,
+    right: 40,
+    textAlign: 'center',
+    fontSize: 10,
+    color: '#666666'
+  }
 });
 
 const CoverPagePDF = ({ 
-  project = {}, 
+  project, 
   logos = [], 
-  coverData = {}, 
-  propertyPhoto = {} 
+  propertyPhoto = null, 
+  customData = {} 
 }) => {
   
-  // Merge project and coverData to handle both prop structures
+  // Merge project data with custom overrides
   const mergedData = {
-    title: project?.title || coverData?.title || 'Closing Binder',
-    propertyAddress: project?.property_address || coverData?.propertyAddress || '',
-    propertyDescription: project?.property_description || coverData?.propertyDescription || '',
-    purchasePrice: project?.purchase_price || coverData?.purchasePrice || '',
-    closingDate: project?.closing_date || coverData?.closingDate || '',
-    buyer: project?.buyer || coverData?.buyer || '',
-    seller: project?.seller || coverData?.seller || '',
-    attorney: project?.attorney || coverData?.attorney || '',
-    lender: project?.lender || coverData?.lender || '',
-    escrowAgent: project?.escrow_agent || coverData?.escrowAgent || ''
+    title: customData.title || project?.title || 'CLOSING BINDER',
+    propertyAddress: customData.propertyAddress || project?.property_address || '',
+    propertyDescription: customData.propertyDescription || project?.property_description || '',
+    purchasePrice: customData.purchasePrice || project?.purchase_price || '',
+    closingDate: customData.closingDate || project?.closing_date || '',
+    buyer: customData.buyer || project?.buyer || '',
+    seller: customData.seller || project?.seller || '',
+    escrowAgent: customData.escrowAgent || project?.escrow_agent || '',
+    attorney: customData.attorney || project?.attorney || '',
+    lender: customData.lender || project?.lender || ''
   };
 
-  // Format purchase price with proper currency formatting
-  const formatPurchasePrice = (value) => {
-    if (!value) return '';
+  // Format purchase price
+  const formatPurchasePrice = (price) => {
+    if (!price) return '';
     
-    // If already formatted with $, use as is
-    if (typeof value === 'string' && value.startsWith('$')) {
-      return value;
-    }
-    
-    // Convert to string and remove all non-digit chars except decimal
-    const numStr = value.toString().replace(/[^\d.]/g, '');
+    const numStr = String(price).replace(/[^0-9.]/g, '');
     
     if (!numStr || numStr === '0') return '$0.00';
     
-    // Convert to number to handle decimals properly
     const num = parseFloat(numStr);
     if (isNaN(num)) return '';
     
-    // Format with commas and 2 decimal places
     return '$' + num.toLocaleString('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
   };
 
-  // Safe property photo URL extraction
+  // FIXED: Property photo URL extraction with multiple fallbacks
   const getPropertyPhotoUrl = () => {
+    // Check multiple possible sources for the property photo
     return project?.property_photo_url || 
            project?.cover_photo_url || 
            propertyPhoto?.property_photo_url || 
            propertyPhoto?.url ||
+           customData?.propertyPhotoUrl ||
            null;
   };
 
-  // Safe logo processing - handle both prop structures
+  // Safe logo processing
   const getSafeLogos = () => {
     if (!logos || !Array.isArray(logos)) return [];
     
@@ -237,12 +214,12 @@ const CoverPagePDF = ({
     
     return text.split('\n').map((line, index) => (
       <Text key={index} style={styles.descriptionText}>
-        {line || ' '} {/* Empty lines become spaces */}
+        {line || ' '}
       </Text>
     ));
   };
 
-  // Safe image rendering function
+  // FIXED: Safe image rendering with proper error handling
   const renderSafeImage = (imageUrl, imageStyles, placeholder) => {
     if (!imageUrl || typeof imageUrl !== 'string' || !imageUrl.trim()) {
       return placeholder;
@@ -280,15 +257,11 @@ const CoverPagePDF = ({
           )}
         </View>
 
-        {/* Main Property Photo */}
+        {/* FIXED: Main Property Photo Section with proper image handling */}
         <View style={styles.photoSection}>
           {renderSafeImage(
             propertyPhotoUrl,
-            {
-              width: 400,
-              height: 250,
-              objectFit: 'cover',
-            },
+            styles.propertyPhoto,
             <View style={styles.photoPlaceholder}>
               <Text style={styles.photoPlaceholderText}>
                 PROPERTY PHOTO{'\n'}
@@ -307,93 +280,78 @@ const CoverPagePDF = ({
           </View>
         )}
 
-        {/* Purchase Price - WITH PROPER FORMATTING */}
+        {/* Purchase Price (prominently displayed) */}
         {formattedPurchasePrice && (
-          <View style={styles.priceSection}>
-            <Text style={styles.priceText}>
-              Purchase Price: {formattedPurchasePrice}
-            </Text>
-          </View>
+          <Text style={styles.purchasePrice}>
+            Purchase Price: {formattedPurchasePrice}
+          </Text>
         )}
 
-        {/* Transaction Details - CONDENSED */}
-        <View style={styles.detailsSection}>
-          <View style={styles.detailsGrid}>
-            <View style={styles.detailColumn}>
-              {mergedData.buyer && (
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Buyer:</Text>
-                  <Text style={styles.detailValue}>{mergedData.buyer}</Text>
-                </View>
-              )}
-              {mergedData.closingDate && (
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Closing:</Text>
-                  <Text style={styles.detailValue}>{formatDate(mergedData.closingDate)}</Text>
-                </View>
-              )}
-              {mergedData.attorney && (
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Attorney:</Text>
-                  <Text style={styles.detailValue}>{mergedData.attorney}</Text>
-                </View>
-              )}
-            </View>
-            
-            <View style={styles.detailColumn}>
-              {mergedData.seller && (
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Seller:</Text>
-                  <Text style={styles.detailValue}>{mergedData.seller}</Text>
-                </View>
-              )}
-              {mergedData.escrowAgent && (
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Escrow:</Text>
-                  <Text style={styles.detailValue}>{mergedData.escrowAgent}</Text>
-                </View>
-              )}
-              {mergedData.lender && (
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Lender:</Text>
-                  <Text style={styles.detailValue}>{mergedData.lender}</Text>
-                </View>
-              )}
-            </View>
+        {/* Transaction Details Grid */}
+        <View style={styles.transactionDetails}>
+          <View style={styles.transactionGrid}>
+            {mergedData.buyer && (
+              <View style={styles.transactionItem}>
+                <Text style={styles.transactionLabel}>Buyer:</Text>
+                <Text style={styles.transactionValue}>{mergedData.buyer}</Text>
+              </View>
+            )}
+            {mergedData.seller && (
+              <View style={styles.transactionItem}>
+                <Text style={styles.transactionLabel}>Seller:</Text>
+                <Text style={styles.transactionValue}>{mergedData.seller}</Text>
+              </View>
+            )}
+            {mergedData.closingDate && (
+              <View style={styles.transactionItem}>
+                <Text style={styles.transactionLabel}>Closing Date:</Text>
+                <Text style={styles.transactionValue}>{formatDate(mergedData.closingDate)}</Text>
+              </View>
+            )}
+            {mergedData.escrowAgent && (
+              <View style={styles.transactionItem}>
+                <Text style={styles.transactionLabel}>Escrow Agent:</Text>
+                <Text style={styles.transactionValue}>{mergedData.escrowAgent}</Text>
+              </View>
+            )}
+            {mergedData.attorney && (
+              <View style={styles.transactionItem}>
+                <Text style={styles.transactionLabel}>Attorney:</Text>
+                <Text style={styles.transactionValue}>{mergedData.attorney}</Text>
+              </View>
+            )}
+            {mergedData.lender && (
+              <View style={styles.transactionItem}>
+                <Text style={styles.transactionLabel}>Lender:</Text>
+                <Text style={styles.transactionValue}>{mergedData.lender}</Text>
+              </View>
+            )}
           </View>
         </View>
 
-        {/* Logo Section - ADJUSTED SIZE AND POSITIONING */}
-        <View style={styles.logoSection}>
-          {safeLogos.map((logo, index) => {
-            const logoUrl = logo.url || logo.logo_url;
-            return (
-              <View key={`logo-${index}`}>
-                {renderSafeImage(
-                  logoUrl,
-                  {
-                    width: 160,  // Much larger for better visibility
-                    height: 100,  // Much larger for better visibility
-                    objectFit: 'contain',
-                  },
-                  <View style={styles.logoPlaceholder}>
-                    <Text style={styles.logoPlaceholderText}>
-                      LOGO {index + 1}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            );
-          })}
-          
-          {/* Fill remaining slots with placeholders */}
-          {Array.from({ length: 3 - safeLogos.length }).map((_, index) => (
-            <View key={`placeholder-${safeLogos.length + index}`} style={styles.logoPlaceholder}>
-              <Text style={styles.logoPlaceholderText}>
-                LOGO {safeLogos.length + index + 1}
-              </Text>
-            </View>
-          ))}
+        {/* Company Logos */}
+        {safeLogos.length > 0 && (
+          <View style={styles.logoContainer}>
+            {safeLogos.map((logo, index) => {
+              const logoUrl = logo?.url || logo?.logo_url;
+              return renderSafeImage(
+                logoUrl,
+                styles.logo,
+                null // No placeholder for logos
+              );
+            })}
+          </View>
+        )}
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          <Text>
+            Generated on {new Date().toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            })}
+          </Text>
         </View>
       </Page>
     </Document>

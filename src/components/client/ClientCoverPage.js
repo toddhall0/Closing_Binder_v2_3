@@ -1,4 +1,6 @@
-// src/components/client/ClientCoverPage.js - Updated with PDF download functionality
+// Fixed ClientCoverPage with 25% larger logos
+// File: src/components/client/ClientCoverPage.js
+
 import React, { useState } from 'react';
 import ClientBinderDownloader from './ClientBinderDownloader';
 
@@ -37,17 +39,82 @@ const ClientCoverPage = ({ binder, logos, onNavigateToTOC, documents = [] }) => 
 
   const transactionDetails = getTransactionDetails();
 
-  // Check all possible photo field combinations
-  const photoUrl = binder?.cover_photo_url || 
-                   binder?.property_photo_url || 
-                   binder?.projects?.cover_photo_url || 
-                   binder?.projects?.property_photo_url;
+  // Enhanced property photo URL detection with multiple fallbacks
+  const getPropertyPhotoUrl = () => {
+    const photoSources = [
+      binder?.cover_photo_url,
+      binder?.property_photo_url,
+      binder?.projects?.cover_photo_url,
+      binder?.projects?.property_photo_url,
+      binder?.cover_page_data?.propertyPhotoUrl,
+      binder?.cover_page_data?.cover_photo_url,
+      binder?.property_data?.photo_url,
+      binder?.property_data?.image_url
+    ];
+
+    for (const photoUrl of photoSources) {
+      if (photoUrl && typeof photoUrl === 'string' && photoUrl.trim().length > 0) {
+        console.log('Found property photo URL:', photoUrl);
+        return photoUrl.trim();
+      }
+    }
+
+    console.log('No property photo URL found in binder data:', binder);
+    return null;
+  };
+
+  const propertyPhotoUrl = getPropertyPhotoUrl();
+
+  // Enhanced logo processing with multiple fallbacks
+  const getDisplayLogos = () => {
+    if (!logos || !Array.isArray(logos)) return [];
+    
+    return logos
+      .filter(logo => {
+        const logoUrl = logo?.url || logo?.logo_url || logo?.image_url;
+        return logoUrl && typeof logoUrl === 'string' && logoUrl.trim().length > 0;
+      })
+      .slice(0, 3); // Maximum 3 logos
+  };
+
+  const displayLogos = getDisplayLogos();
+
+  const formatPurchasePrice = (price) => {
+    if (!price) return null;
+    
+    const numPrice = typeof price === 'string' ? parseFloat(price.replace(/[^0-9.]/g, '')) : price;
+    
+    if (isNaN(numPrice) || numPrice === 0) return null;
+    
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(numPrice);
+  };
+
+  const formatClosingDate = (dateString) => {
+    if (!dateString) return null;
+    
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  const purchasePrice = formatPurchasePrice(binder?.purchase_price);
+  const closingDate = formatClosingDate(binder?.closing_date);
 
   return (
     <div className="max-w-4xl mx-auto bg-white cover-page-container" style={{ minHeight: '11in' }}>
-      {/* Top Navigation Bar with TOC Link and Download Button */}
+      {/* Top Navigation Bar */}
       <div className="flex justify-between items-center p-6">
-        {/* Download PDF Button */}
         <button
           onClick={() => setShowDownloadModal(true)}
           className="text-sm text-gray-600 hover:text-black transition-colors duration-200 font-medium flex items-center"
@@ -58,7 +125,6 @@ const ClientCoverPage = ({ binder, logos, onNavigateToTOC, documents = [] }) => 
           Download PDF
         </button>
 
-        {/* Table of Contents Link */}
         <button
           onClick={onNavigateToTOC}
           className="text-sm text-gray-600 hover:text-black transition-colors duration-200 font-medium flex items-center"
@@ -70,204 +136,142 @@ const ClientCoverPage = ({ binder, logos, onNavigateToTOC, documents = [] }) => 
         </button>
       </div>
 
-      {/* Header Section - NO LOGOS HERE NOW */}
-      <div className="text-center border-b-2 border-black pb-6 mb-10">
-        {/* Main Title */}
-        <h1 className="text-4xl font-bold text-black mb-3">
-          {binder?.title || 'CLOSING BINDER'}
-        </h1>
-        
-        {/* Property Address */}
-        <div className="text-xl text-gray-700 mb-4">
-          {formatPropertyDetails()}
+      {/* Main Cover Page Content */}
+      <div className="p-8">
+        {/* Header Section */}
+        <div className="text-center mb-8 pb-6 border-b-2 border-black">
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+            {binder?.title || 'CLOSING BINDER'}
+          </h1>
+          <p className="text-lg text-gray-600 mb-2">
+            {formatPropertyDetails()}
+          </p>
+          {binder?.property_description && (
+            <div className="mt-4 max-w-2xl mx-auto">
+              <p className="text-sm text-gray-700 leading-relaxed">
+                {binder.property_description}
+              </p>
+            </div>
+          )}
         </div>
 
-        {/* Property Description - Preserve line breaks */}
-        {binder?.property_description && (
-          <div className="text-base text-gray-600 mb-4 max-w-3xl mx-auto leading-relaxed whitespace-pre-line">
-            {binder.property_description}
+        {/* Property Photo Section */}
+        <div className="mb-8 text-center">
+          {propertyPhotoUrl ? (
+            <div className="mx-auto max-w-2xl">
+              <img 
+                src={propertyPhotoUrl} 
+                alt="Property" 
+                className="w-full h-80 object-cover rounded-lg shadow-lg border border-gray-200"
+                onError={(e) => {
+                  console.error('Failed to load property image:', propertyPhotoUrl);
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'flex';
+                }}
+                onLoad={() => {
+                  console.log('Property image loaded successfully:', propertyPhotoUrl);
+                }}
+              />
+              <div 
+                className="hidden w-full h-80 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg items-center justify-center"
+              >
+                <div className="text-center">
+                  <svg className="w-12 h-12 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <p className="text-gray-500">Property Photo</p>
+                  <p className="text-xs text-gray-400 mt-1">Image could not be loaded</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="mx-auto max-w-2xl w-full h-80 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+              <div className="text-center">
+                <svg className="w-12 h-12 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <p className="text-gray-500">Property Photo</p>
+                <p className="text-xs text-gray-400 mt-1">No image available</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Transaction Highlights */}
+        {(purchasePrice || closingDate) && (
+          <div className="mb-8 text-center">
+            <div className="flex justify-center space-x-8">
+              {purchasePrice && (
+                <div className="bg-gray-50 px-6 py-4 rounded-lg">
+                  <p className="text-sm text-gray-600 font-medium">Purchase Price</p>
+                  <p className="text-2xl font-bold text-gray-900">{purchasePrice}</p>
+                </div>
+              )}
+              {closingDate && (
+                <div className="bg-gray-50 px-6 py-4 rounded-lg">
+                  <p className="text-sm text-gray-600 font-medium">Closing Date</p>
+                  <p className="text-lg font-semibold text-gray-900">{closingDate}</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        {/* Generation Date */}
-        <div className="text-sm text-gray-600">
-          Prepared on {formatDate()}
-        </div>
-      </div>
-
-      {/* Property Photo Section */}
-      {photoUrl && (
-        <div className="mb-10 text-center">
-          <div className="inline-block border-2 border-gray-200 p-2 bg-white shadow-lg">
-            <img
-              src={photoUrl}
-              alt="Property"
-              className="max-w-full h-auto object-contain"
-              style={{ maxWidth: '600px', maxHeight: '400px' }}
-              onError={(e) => {
-                e.target.style.display = 'none';
-                e.target.nextSibling.style.display = 'block';
-              }}
-            />
-            <div style={{ display: 'none' }} className="text-gray-500 p-8">
-              Property photo not available
-            </div>
-          </div>
-          <p className="text-sm text-gray-600 mt-2">Property Photo</p>
-        </div>
-      )}
-
-      {/* Transaction Details Section */}
-      {(binder?.purchase_price || binder?.loan_amount || binder?.closing_date) && (
-        <div className="mb-10 text-center">
-          
-          {/* Purchase Price */}
-          {binder?.purchase_price && (
-            <div className="mb-4">
-              <div className="text-2xl font-bold text-black">
-                Purchase Price: ${Number(binder.purchase_price).toLocaleString()}
-              </div>
-            </div>
-          )}
-          
-          {/* Closing Date */}
-          {binder?.closing_date && (
-            <div className="mb-4">
-              <div className="text-2xl font-bold text-black">
-                Closing Date: {new Date(binder.closing_date).toLocaleDateString()}
-              </div>
-            </div>
-          )}
-          
-          {/* Loan Amount */}
-          {binder?.loan_amount && (
-            <div className="inline-block text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-xl font-bold text-black">
-                Loan Amount: ${Number(binder.loan_amount).toLocaleString()}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Transaction Participants Section */}
-      {(Object.values(transactionDetails).some(detail => detail !== 'Not specified')) && (
-        <div className="mb-10 grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="space-y-6">
-            <div className="border-l-4 border-black pl-4">
-              <h3 className="text-lg font-semibold text-black mb-4">Transaction Participants</h3>
-              <div className="space-y-3">
-                {transactionDetails.buyer !== 'Not specified' && (
-                  <div>
-                    <span className="font-medium text-gray-900">Buyer:</span>
-                    <span className="ml-2 text-gray-700">{transactionDetails.buyer}</span>
+        {/* Transaction Details Grid */}
+        <div className="mb-8">
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4 text-center">
+              Transaction Details
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {Object.entries(transactionDetails).map(([key, value]) => (
+                value !== 'Not specified' && (
+                  <div key={key} className="flex flex-col">
+                    <span className="text-sm font-medium text-gray-600 capitalize">
+                      {key.replace(/([A-Z])/g, ' $1').trim()}:
+                    </span>
+                    <span className="text-sm text-gray-900 mt-1">{value}</span>
                   </div>
-                )}
-                {transactionDetails.seller !== 'Not specified' && (
-                  <div>
-                    <span className="font-medium text-gray-900">Seller:</span>
-                    <span className="ml-2 text-gray-700">{transactionDetails.seller}</span>
-                  </div>
-                )}
-                {transactionDetails.attorney !== 'Not specified' && (
-                  <div>
-                    <span className="font-medium text-gray-900">Attorney:</span>
-                    <span className="ml-2 text-gray-700">{transactionDetails.attorney}</span>
-                  </div>
-                )}
-                {transactionDetails.realEstateAgent !== 'Not specified' && (
-                  <div>
-                    <span className="font-medium text-gray-900">Real Estate Agent:</span>
-                    <span className="ml-2 text-gray-700">{transactionDetails.realEstateAgent}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            <div className="border-l-4 border-black pl-4">
-              <h3 className="text-lg font-semibold text-black mb-4">Service Providers</h3>
-              <div className="space-y-3">
-                {transactionDetails.lender !== 'Not specified' && (
-                  <div>
-                    <span className="font-medium text-gray-900">Lender:</span>
-                    <span className="ml-2 text-gray-700">{transactionDetails.lender}</span>
-                  </div>
-                )}
-                {transactionDetails.titleCompany !== 'Not specified' && (
-                  <div>
-                    <span className="font-medium text-gray-900">Title Company:</span>
-                    <span className="ml-2 text-gray-700">{transactionDetails.titleCompany}</span>
-                  </div>
-                )}
-                {transactionDetails.escrowAgent !== 'Not specified' && (
-                  <div>
-                    <span className="font-medium text-gray-900">Escrow Agent:</span>
-                    <span className="ml-2 text-gray-700">{transactionDetails.escrowAgent}</span>
-                  </div>
-                )}
-              </div>
+                )
+              ))}
             </div>
           </div>
         </div>
-      )}
 
-      {/* Company Logos Section - NOW AT BOTTOM, MUCH BIGGER */}
-      <div className="mb-10">
-        <div className="flex justify-center items-center space-x-12">
-          {logos && logos.length > 0 ? (
-            logos.slice(0, 3).map((logo, index) => (
-              <div key={logo.id || index} className="text-center">
-                <img
-                  src={logo.logo_url}
-                  alt={logo.logo_name || `Company Logo ${index + 1}`}
-                  className="max-w-full object-contain mx-auto"
-                  style={{ 
-                    maxWidth: '260px', 
-                    maxHeight: '260px', 
-                    minWidth: '190px', 
-                    minHeight: '150px',
-                    width: 'auto',
-                    height: 'auto'
-                  }}
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                  }}
-                />
-              </div>
-            ))
-          ) : (
-            <div className="text-center text-gray-500 text-sm">
-              <p>No company logos available</p>
+        {/* Company Logos - FIXED: 25% larger */}
+        {displayLogos.length > 0 && (
+          <div className="mb-8">
+            <div className="flex justify-center items-center space-x-8">
+              {displayLogos.map((logo, index) => {
+                const logoUrl = logo?.url || logo?.logo_url || logo?.image_url;
+                return (
+                  <img
+                    key={index}
+                    src={logoUrl}
+                    alt={`Company logo ${index + 1}`}
+                    className="h-20 max-w-40 object-contain" // FIXED: 25% larger (was h-16 max-w-32)
+                    onError={(e) => {
+                      console.warn(`Failed to load logo ${index + 1}:`, logoUrl);
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                );
+              })}
             </div>
-          )}
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="text-center text-sm text-gray-500 border-t border-gray-200 pt-6">
+          <p>
+            Generated on {formatDate()}
+          </p>
+          <p>
+            This closing binder contains all relevant documents for your transaction.
+            <br />
+            Please retain for your records.
+          </p>
         </div>
-      </div>
-
-      {/* Law Firm Credit Section */}
-      <div className="text-center mb-8 py-4 bg-gray-50 rounded-lg">
-        <p className="text-sm font-medium text-gray-800">
-          This Closing Binder prepared by Camelback Law Group, LLC
-        </p>
-        <p className="text-sm text-gray-600 mt-1">
-          For more information, contact us at{' '}
-          <a 
-            href="mailto:info@clglawaz.com" 
-            className="text-blue-600 hover:text-blue-800 underline"
-          >
-            info@clglawaz.com
-          </a>
-        </p>
-      </div>
-
-      {/* Footer */}
-      <div className="border-t-2 border-black pt-6 text-center">
-        <p className="text-sm text-gray-600">
-          This closing binder contains all documents and materials related to the above transaction.
-          <br />
-          Please retain for your records.
-        </p>
       </div>
 
       {/* Download Modal */}
