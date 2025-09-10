@@ -85,7 +85,7 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
 
       if (projectData) {
         const formattedPrice = projectData.purchase_price != null ? String(projectData.purchase_price) : '';
-        
+
         setCoverData({
           title: projectData.title || '',
           propertyAddress: projectData.property_address || '',
@@ -97,7 +97,7 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
           seller: projectData.seller || '',
           escrowAgent: projectData.escrow_agent || '',
           purchasePrice: formattedPrice,
-          contact_info: projectData.contact_info || {}
+          contact_info: (projectData.cover_page_data && projectData.cover_page_data.contact_info) || {}
         });
 
         setPropertyPhoto({
@@ -205,7 +205,10 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
           seller: coverData.seller || null,
           escrow_agent: coverData.escrowAgent || null,
           purchase_price: priceValue,
-          contact_info: coverData.contact_info,
+          cover_page_data: {
+            ...(project?.cover_page_data || {}),
+            contact_info: coverData.contact_info
+          },
           updated_at: new Date().toISOString()
         })
         .eq('id', project.id);
@@ -289,7 +292,7 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
           <button onClick={() => setPreviewMode('cover')} className={`text-sm ${previewMode === 'cover' ? 'font-semibold text-black' : 'text-gray-600 hover:text-black'} underline-offset-4 hover:underline`}>Cover Page</button>
           <button onClick={() => setPreviewMode('toc')} className={`text-sm ${previewMode === 'toc' ? 'font-semibold text-black' : 'text-gray-600 hover:text-black'} underline-offset-4 hover:underline`}>Table of Contents</button>
           <button onClick={() => setPreviewMode('contact')} className={`text-sm ${previewMode === 'contact' ? 'font-semibold text-black' : 'text-gray-600 hover:text-black'} underline-offset-4 hover:underline`}>Contact Information</button>
-        </div>
+              </div>
         <div className="mx-auto bg-transparent rounded-lg overflow-hidden" style={{ width: '50%', aspectRatio: '1 / 1.75' }}>
           <div className="w-[300%] h-full flex transition-transform duration-500" style={{ transform: previewMode === 'cover' ? 'translateX(0%)' : previewMode === 'toc' ? 'translateX(-33.3333%)' : 'translateX(-66.6666%)' }}>
             {/* Slide 1: Cover */}
@@ -533,11 +536,11 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
                       })}
                     </div>
                   </div>
-                </div>
               </div>
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       {/* Full-width Basic Information */}
