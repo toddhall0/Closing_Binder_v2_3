@@ -38,24 +38,31 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
   const [tocStructure, setTocStructure] = useState({ sections: [], documents: [] });
   const [tocLoading, setTocLoading] = useState(false);
 
-  // Format purchase price with proper currency formatting
-  const formatPurchasePrice = (value) => {
-    if (!value) return '';
-    
-    // Convert to string and remove all non-digit chars except decimal
-    const numStr = value.toString().replace(/[^\d.]/g, '');
-    
-    if (!numStr || numStr === '0') return '$0.00';
-    
-    // Convert to number to handle decimals properly
-    const num = parseFloat(numStr);
-    if (isNaN(num)) return '';
-    
-    // Format with commas and 2 decimal places
-    return '$' + num.toLocaleString('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
+  // Sanitize price input for typing (allow multiple digits and one decimal, up to 2 decimals)
+  const sanitizePriceInput = (value) => {
+    if (value == null) return '';
+    let s = String(value).replace(/[^\d.]/g, '');
+    // Keep only first decimal point
+    const firstDot = s.indexOf('.');
+    if (firstDot !== -1) {
+      s = s.slice(0, firstDot + 1) + s.slice(firstDot + 1).replace(/\./g, '');
+    }
+    // Limit to two decimal places
+    if (firstDot !== -1) {
+      const [intPart, decPart] = s.split('.');
+      s = intPart + '.' + decPart.slice(0, 2);
+    }
+    // Trim leading zeros while preserving "0." pattern
+    s = s.replace(/^0+(\d)/, '$1');
+    return s;
+  };
+
+  // Format for preview display
+  const formatCurrencyDisplay = (raw) => {
+    if (!raw) return null;
+    const num = Number(raw);
+    if (!isFinite(num)) return null;
+    return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   };
 
   const loadCoverData = useCallback(async () => {
@@ -77,7 +84,7 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
       }
 
       if (projectData) {
-        const formattedPrice = formatPurchasePrice(projectData.purchase_price);
+        const formattedPrice = projectData.purchase_price != null ? String(projectData.purchase_price) : '';
         
         setCoverData({
           title: projectData.title || '',
@@ -161,8 +168,8 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
 
   const handlePurchasePriceChange = (e) => {
     const inputValue = e.target.value;
-    const formattedValue = formatPurchasePrice(inputValue);
-    setCoverData(prev => ({ ...prev, purchasePrice: formattedValue }));
+    const clean = sanitizePriceInput(inputValue);
+    setCoverData(prev => ({ ...prev, purchasePrice: clean }));
   };
 
   // Format description with line breaks for display
@@ -321,7 +328,7 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
                         {coverData.purchasePrice && (
                           <div className="bg-gray-50 px-4 py-3 rounded-lg">
                             <div className="text-xs text-gray-600 font-medium">Purchase Price</div>
-                            <div className="text-sm font-bold text-gray-900">{coverData.purchasePrice}</div>
+                            <div className="text-sm font-bold text-gray-900">{formatCurrencyDisplay(coverData.purchasePrice) || coverData.purchasePrice}</div>
                   </div>
                         )}
                         {coverData.closingDate && (
@@ -553,7 +560,7 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Purchase Price</label>
-              <input type="text" value={coverData.purchasePrice} onChange={handlePurchasePriceChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:border-black" placeholder="$0.00" />
+              <input type="text" inputMode="decimal" value={coverData.purchasePrice} onChange={handlePurchasePriceChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:border-black" placeholder="0.00" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Closing Date</label>

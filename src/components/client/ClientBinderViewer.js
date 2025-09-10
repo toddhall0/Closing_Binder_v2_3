@@ -123,13 +123,13 @@ const ClientBinderViewer = () => {
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold text-black">Contact Information</h1>
         </div>
-        <div className="space-y-6">
+        <div className="space-y-8">
           {roles.map((role) => {
             const data = info[role.key] || {};
             const hasAny = ['company','representative','address','email','phone','web'].some(k => !!data[k]);
             if (!hasAny) return null;
             return (
-              <div key={role.key} className="border-l-4 border-black pl-4">
+              <div key={role.key} className="border-l-4 border-black pl-4 py-2">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">{role.label}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                   {data.company && <div><span className="font-medium">Company:</span> {data.company}</div>}

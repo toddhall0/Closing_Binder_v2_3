@@ -39,7 +39,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   block: {
-    marginBottom: 10,
+    marginBottom: 14,
+    paddingBottom: 6,
   },
   footer: {
     position: 'absolute',
