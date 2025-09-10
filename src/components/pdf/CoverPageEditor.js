@@ -192,7 +192,7 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
       const rawPrice = coverData.purchasePrice.replace(/[$,]/g, '');
       const priceValue = rawPrice ? parseFloat(rawPrice) : null;
       
-      const { error } = await supabase
+      const { data: updatedProject, error } = await supabase
         .from('projects')
         .update({
           title: coverData.title,
@@ -208,16 +208,16 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
           contact_info: coverData.contact_info,
           updated_at: new Date().toISOString()
         })
-        .eq('id', project.id);
+        .eq('id', project.id)
+        .select('*')
+        .single();
 
       if (error) throw error;
 
       alert('Cover page data saved successfully!');
       
-      // Call onProjectUpdate if provided to refresh parent component
-      if (onProjectUpdate) {
-        onProjectUpdate();
-      }
+      // Call onProjectUpdate with fresh project data so parent doesn't lose project state
+      if (onProjectUpdate) onProjectUpdate(updatedProject || project);
     } catch (error) {
       console.error('Error saving cover data:', error);
       alert('Failed to save cover page data: ' + error.message);

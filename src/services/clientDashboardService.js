@@ -25,12 +25,40 @@ export class ClientDashboardService {
 
       const accessCode = accessCodeData;
 
+      // Resolve client_id by email (create client if not exists)
+      let clientId = null;
+      if (binderData.clientEmail) {
+        const emailLower = binderData.clientEmail.toLowerCase();
+        const { data: existingClient } = await supabase
+          .from('clients')
+          .select('id')
+          .eq('email', emailLower)
+          .maybeSingle();
+        if (existingClient?.id) {
+          clientId = existingClient.id;
+        } else {
+          // Create a client row (best-effort)
+          const name = binderData.clientName?.trim() || emailLower.split('@')[0];
+          const slugBase = name.replace(/[^a-z0-9]+/gi, '-').toLowerCase().replace(/^-+|-+$/g, '') || emailLower.split('@')[0];
+          const slug = `${slugBase}-${Math.random().toString(16).slice(2, 8)}`;
+          const { data: newClient, error: clientErr } = await supabase
+            .from('clients')
+            .insert({ name, email: emailLower, slug })
+            .select('id')
+            .single();
+          if (!clientErr && newClient?.id) {
+            clientId = newClient.id;
+          }
+        }
+      }
+
       // Prepare binder data
       const publishData = {
         project_id: binderData.projectId,
         user_id: user.id,
         client_name: binderData.clientName,
         client_email: binderData.clientEmail,
+        client_id: clientId || null,
         access_code: accessCode,
         title: binderData.title,
         property_address: binderData.propertyAddress,
@@ -45,12 +73,37 @@ export class ClientDashboardService {
         published_at: new Date().toISOString()
       };
 
-      // Insert client binder
-      const { data, error } = await supabase
-        .from('client_binders')
-        .insert(publishData)
-        .select()
-        .single();
+      // Upsert: if a binder already exists for this project + client, update it instead of inserting
+      let existing = null;
+      try {
+        const { data: existingRow } = await supabase
+          .from('client_binders')
+          .select('id')
+          .eq('project_id', publishData.project_id)
+          .eq('client_email', publishData.client_email)
+          .limit(1)
+          .maybeSingle();
+        existing = existingRow || null;
+      } catch {}
+
+      let data, error;
+      if (existing?.id) {
+        ({ data, error } = await supabase
+          .from('client_binders')
+          .update({
+            ...publishData,
+            access_code: publishData.access_code // keep a fresh code if needed
+          })
+          .eq('id', existing.id)
+          .select()
+          .single());
+      } else {
+        ({ data, error } = await supabase
+          .from('client_binders')
+          .insert(publishData)
+          .select()
+          .single());
+      }
 
       if (error) throw error;
 
@@ -62,7 +115,11 @@ export class ClientDashboardService {
           is_downloadable: doc.isDownloadable !== false,
           is_viewable: doc.isViewable !== false
         }));
-
+        // Replace existing document links for this binder
+        await supabase
+          .from('client_binder_documents')
+          .delete()
+          .eq('client_binder_id', data.id);
         const { error: docsError } = await supabase
           .from('client_binder_documents')
           .insert(documentRecords);
@@ -72,7 +129,14 @@ export class ClientDashboardService {
         }
       }
 
-      return { data, error: null };
+      // Fetch client to get slug for convenience
+      let client = null;
+      if (data?.client_id) {
+        const { data: c } = await supabase.from('clients').select('slug').eq('id', data.client_id).maybeSingle();
+        client = c || null;
+      }
+
+      return { data: { ...data, client_slug: client?.slug || null }, error: null };
     } catch (error) {
       console.error('Error publishing binder:', error);
       return { data: null, error };
@@ -113,6 +177,157 @@ export class ClientDashboardService {
     } catch (error) {
       console.error('Error fetching published binders:', error);
       return { data: [], error };
+    }
+  }
+
+  /**
+   * Get client-facing binders assigned to the currently authenticated client user
+   * Supports filtering by date range, state, parties and keyword search.
+   * Note: This assumes Supabase RLS policies expose only binders where the
+   * authenticated user's email matches client_email (or an invites table RLS).
+   * @param {Object} filters
+   * @param {string} [filters.query] - keyword across title/address/description
+   * @param {string} [filters.state] - state filter if stored on project/binder
+   * @param {string[]} [filters.parties] - array of party roles to filter when present in cover_page_data/contact_info
+   * @param {string} [filters.from] - ISO date string (created_at/published_at >= from)
+   * @param {string} [filters.to] - ISO date string (created_at/published_at <= to)
+   * @returns {Promise<{data: Array, error: Error|null}>}
+   */
+  static async getClientBinders(filters = {}) {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+      let query = supabase
+        .from('client_binders')
+        .select(`
+          *,
+          projects(title, property_address, cover_photo_url, property_photo_url)
+        `)
+        .eq('is_published', true)
+        .eq('is_active', true)
+        // RLS expected to limit by client; also add defensive filter by email if available
+        .or(`client_email.eq.${user.email},user_id.eq.${user.id})`);
+
+      // Not expired
+      query = query.or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
+
+      // Date range using published_at if present, else created_at
+      if (filters.from) {
+        query = query.gte('published_at', filters.from);
+      }
+      if (filters.to) {
+        query = query.lte('published_at', filters.to);
+      }
+
+      // State filter fallback: search within address fields if schema lacks state column
+      if (filters.state) {
+        const like = `%${filters.state}%`;
+        query = query.or(`property_address.ilike.${like},projects.property_address.ilike.${like}`);
+      }
+
+      // Keyword search
+      if (filters.query && filters.query.trim().length > 0) {
+        const like = `%${filters.query.trim()}%`;
+        query = query.or(
+          `title.ilike.${like},property_address.ilike.${like},property_description.ilike.${like},projects.title.ilike.${like},projects.property_address.ilike.${like}`
+        );
+      }
+
+      const { data, error } = await query.order('published_at', { ascending: false });
+      if (error) throw error;
+
+      // Optional: client-side filter for parties when stored in JSON
+      let result = data || [];
+      if (filters.parties && Array.isArray(filters.parties) && filters.parties.length > 0) {
+        const partyKeys = new Set(filters.parties.map(p => String(p).toLowerCase()));
+        result = result.filter(b => {
+          const info = b?.cover_page_data?.contact_info || b?.contact_info || {};
+          return Array.from(partyKeys).every(key => info[key]);
+        });
+      }
+
+      return { data: result, error: null };
+    } catch (error) {
+      console.error('Error fetching client binders:', error);
+      return { data: [], error };
+    }
+  }
+
+  /**
+   * Get a client by slug
+   * @param {string} slug
+   * @returns {Promise<{data: Object|null, error: Error|null}>}
+   */
+  static async getClientBySlug(slug) {
+    try {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('slug', slug)
+        .single();
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      return { data: null, error };
+    }
+  }
+
+  /**
+   * Get binders for a given client slug (auth required)
+   * @param {string} slug
+   * @param {Object} filters
+   */
+  static async getClientBindersBySlug(slug, filters = {}) {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error('User not authenticated');
+
+      const { data: client, error: clientErr } = await this.getClientBySlug(slug);
+      if (clientErr || !client) throw new Error('Client not found');
+
+      let query = supabase
+        .from('client_binders')
+        .select(`
+          *,
+          projects(title, property_address, cover_photo_url, property_photo_url)
+        `)
+        .eq('client_id', client.id)
+        .eq('is_published', true)
+        .eq('is_active', true)
+        .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
+
+      if (filters.from) query = query.gte('published_at', filters.from);
+      if (filters.to) query = query.lte('published_at', filters.to);
+      if (filters.state) {
+        const like = `%${filters.state}%`;
+        query = query.or(`property_address.ilike.${like},projects.property_address.ilike.${like}`);
+      }
+      if (filters.query && filters.query.trim()) {
+        const like = `%${filters.query.trim()}%`;
+        query = query.or(
+          `title.ilike.${like},property_address.ilike.${like},property_description.ilike.${like},projects.title.ilike.${like},projects.property_address.ilike.${like}`
+        );
+      }
+
+      const { data, error } = await query.order('published_at', { ascending: false });
+      if (error) throw error;
+
+      let result = data || [];
+      if (filters.parties && Array.isArray(filters.parties) && filters.parties.length > 0) {
+        const partyKeys = new Set(filters.parties.map(p => String(p).toLowerCase()));
+        result = result.filter(b => {
+          const info = b?.cover_page_data?.contact_info || b?.contact_info || {};
+          return Array.from(partyKeys).every(key => info[key]);
+        });
+      }
+
+      return { data: { client, binders: result }, error: null };
+    } catch (error) {
+      console.error('Error fetching client binders by slug:', error);
+      return { data: { client: null, binders: [] }, error };
     }
   }
 
@@ -173,6 +388,77 @@ export class ClientDashboardService {
 
 static async getBinderByAccessCode(accessCode, password = null) {
   try {
+    // Preferred path: secure RPC that bypasses RLS for nested reads
+    try {
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_client_binder', {
+        p_access_code: accessCode,
+        p_password: password || null
+      });
+      if (!rpcError && rpcData) {
+        const binderRow = rpcData.binder || {};
+        const projectRow = rpcData.project || {};
+        const sections = rpcData.sections || [];
+        const docs = rpcData.documents || [];
+        const logos = rpcData.logos || [];
+
+        // Merge cover page data and contact info from both binder and project
+        const coverMerged = {
+          ...(binderRow.cover_page_data || {}),
+          ...(projectRow.cover_page_data || {})
+        };
+        if (!coverMerged.contact_info) {
+          coverMerged.contact_info = projectRow.contact_info || (projectRow.cover_page_data && projectRow.cover_page_data.contact_info) || null;
+        }
+
+        // Build enriched object compatible with existing viewer
+        const enrichedData = {
+          ...binderRow,
+          projects: projectRow,
+          logos,
+          table_of_contents_data: {
+            ...(binderRow.table_of_contents_data || {}),
+            sections
+          },
+          cover_page_data: coverMerged || binderRow.cover_page_data || null,
+          // Provide flat documents array for viewer convenience
+          documents: docs.map(d => {
+            const storage_path = d.storage_path || d.file_path || null;
+            let url = null;
+            if (storage_path) {
+              url = `${process.env.REACT_APP_SUPABASE_URL}/storage/v1/object/public/documents/${String(storage_path).replace(/^documents\//, '')}`;
+            } else if (d.file_url) {
+              url = d.file_url;
+            }
+            return {
+              ...d,
+              display_name: d.display_name || d.original_name || d.name || 'Unnamed Document',
+              url
+            };
+          })
+        };
+
+        // Derive top-level transaction fields from cover if missing
+        const cv = coverMerged || {};
+        enrichedData.contact_info = enrichedData.contact_info || cv.contact_info || projectRow.contact_info || null;
+        enrichedData.purchase_price = enrichedData.purchase_price || cv.purchasePrice || projectRow.purchase_price || null;
+        enrichedData.closing_date = enrichedData.closing_date || cv.closingDate || projectRow.closing_date || null;
+        enrichedData.buyer = enrichedData.buyer || cv.buyer || projectRow.buyer || null;
+        enrichedData.seller = enrichedData.seller || cv.seller || projectRow.seller || null;
+        enrichedData.attorney = enrichedData.attorney || cv.attorney || projectRow.attorney || null;
+        enrichedData.lender = enrichedData.lender || cv.lender || projectRow.lender || null;
+        enrichedData.escrow_agent = enrichedData.escrow_agent || cv.escrowAgent || projectRow.escrow_agent || null;
+        enrichedData.title_company = enrichedData.title_company || cv.titleCompany || projectRow.title_company || null;
+        enrichedData.property_photo_url = enrichedData.property_photo_url || cv.propertyPhotoUrl || projectRow.property_photo_url || null;
+
+        // Track the view (best-effort)
+        await this.trackBinderView(enrichedData.id);
+        console.log('Enriched binder data:', enrichedData);
+        return { data: enrichedData, error: null };
+      }
+    } catch (rpcCatch) {
+      console.log('RPC get_client_binder failed, falling back to joins:', rpcCatch);
+    }
+
     let query = supabase
       .from('client_binders')
       .select(`
@@ -184,15 +470,7 @@ static async getBinderByAccessCode(accessCode, password = null) {
           document_id,
           is_downloadable,
           is_viewable,
-          documents(
-            id,
-            name,
-            section_id,
-            file_url,
-            file_path,
-            file_size,
-            sort_order
-          )
+          documents(*)
         )
       `)
       .eq('access_code', accessCode)
@@ -218,23 +496,25 @@ static async getBinderByAccessCode(accessCode, password = null) {
       }
     }
 
-    // FIXED: Properly flatten and merge the project data
+    // FIXED: Properly flatten and merge the project data without overriding binder id
     const projectData = data.projects || {};
+    const { id: projectId, ...projectRest } = projectData;
     
     const enrichedData = {
       ...data,
-      // Flatten all project fields to top level
-      ...projectData,
-      // Override with binder-specific data if it exists
+      // Flatten selected project fields but preserve binder identifiers
+      ...projectRest,
+      // Explicitly keep binder id and project_id
+      id: data.id,
+      project_id: data.project_id,
+      // Override with binder-specific data if present
       title: data.title || projectData.title,
       property_address: data.property_address || projectData.property_address,
       property_description: data.property_description || projectData.property_description,
-      
-      // Ensure photo fields are properly mapped
+      // Photo fields
       cover_photo_url: data.cover_photo_url || projectData.cover_photo_url || projectData.property_photo_url,
       property_photo_url: data.property_photo_url || projectData.property_photo_url || projectData.cover_photo_url,
-      
-      // Keep the projects object for debugging
+      // Keep full project for reference
       projects: projectData
     };
 

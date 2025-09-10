@@ -37,7 +37,16 @@ const ClientCoverPage = ({ binder, logos, onNavigateToTOC, documents = [] }) => 
     realEstateAgent: binder?.real_estate_agent || 'Not specified'
   });
 
-  const transactionDetails = getTransactionDetails();
+  const cpd = binder?.cover_page_data || {};
+  const proj = binder?.projects || {};
+  const transactionDetails = {
+    buyer: cpd.buyer || binder?.buyer || proj?.buyer || 'Not specified',
+    seller: cpd.seller || binder?.seller || proj?.seller || 'Not specified',
+    attorney: cpd.attorney || binder?.attorney || proj?.attorney || 'Not specified',
+    lender: cpd.lender || binder?.lender || proj?.lender || 'Not specified',
+    escrowAgent: cpd.escrowAgent || binder?.escrow_agent || proj?.escrow_agent || 'Not specified',
+    titleCompany: cpd.titleCompany || binder?.title_company || proj?.title_company || 'Not specified'
+  };
 
   // Enhanced property photo URL detection with multiple fallbacks
   const getPropertyPhotoUrl = () => {
@@ -80,18 +89,18 @@ const ClientCoverPage = ({ binder, logos, onNavigateToTOC, documents = [] }) => 
   const displayLogos = getDisplayLogos();
 
   const formatPurchasePrice = (price) => {
-    if (!price) return null;
-    
-    const numPrice = typeof price === 'string' ? parseFloat(price.replace(/[^0-9.]/g, '')) : price;
-    
-    if (isNaN(numPrice) || numPrice === 0) return null;
-    
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(numPrice);
+    if (price == null || price === '') return null;
+    let raw = price;
+    if (typeof raw === 'string') {
+      raw = raw.replace(/[^0-9.]/g, '');
+      const firstDot = raw.indexOf('.');
+      if (firstDot !== -1) {
+        raw = raw.slice(0, firstDot + 1) + raw.slice(firstDot + 1).replace(/\./g, '');
+      }
+    }
+    const num = Number(raw);
+    if (!isFinite(num) || num <= 0) return null;
+    return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   };
 
   const formatClosingDate = (dateString) => {
@@ -108,8 +117,8 @@ const ClientCoverPage = ({ binder, logos, onNavigateToTOC, documents = [] }) => 
     }
   };
 
-  const purchasePrice = formatPurchasePrice(binder?.purchase_price);
-  const closingDate = formatClosingDate(binder?.closing_date);
+  const purchasePrice = formatPurchasePrice(cpd?.purchasePrice || binder?.purchase_price || proj?.purchase_price);
+  const closingDate = formatClosingDate(cpd?.closingDate || binder?.closing_date || proj?.closing_date);
 
   return (
     <div className="max-w-4xl mx-auto bg-white cover-page-container" style={{ minHeight: '11in' }}>
@@ -197,66 +206,63 @@ const ClientCoverPage = ({ binder, logos, onNavigateToTOC, documents = [] }) => 
           )}
         </div>
 
-        {/* Transaction Highlights */}
-        {(purchasePrice || closingDate) && (
-          <div className="mb-8 text-center">
-            <div className="flex justify-center space-x-8">
+        {/* Transaction Highlights: 2x2 grid (50% each): Price | Date on row 1, Buyer | Seller on row 2 */}
+        {(purchasePrice || closingDate || transactionDetails.buyer !== 'Not specified' || transactionDetails.seller !== 'Not specified') && (
+          <div className="mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
+              {/* Row 1 */}
               {purchasePrice && (
-                <div className="bg-gray-50 px-6 py-4 rounded-lg">
-                  <p className="text-sm text-gray-600 font-medium">Purchase Price</p>
-                  <p className="text-2xl font-bold text-gray-900">{purchasePrice}</p>
+                <div className="bg-gray-50 px-6 py-4 rounded-lg text-center">
+                  <p className="text-2xl text-gray-900 font-extrabold leading-tight">Purchase Price</p>
+                  <p className="text-lg font-semibold text-gray-900">{purchasePrice}</p>
                 </div>
               )}
               {closingDate && (
-                <div className="bg-gray-50 px-6 py-4 rounded-lg">
-                  <p className="text-sm text-gray-600 font-medium">Closing Date</p>
+                <div className="bg-gray-50 px-6 py-4 rounded-lg text-center">
+                  <p className="text-2xl text-gray-900 font-extrabold leading-tight">Closing Date</p>
                   <p className="text-lg font-semibold text-gray-900">{closingDate}</p>
+                </div>
+              )}
+              {/* Row 2 */}
+              {transactionDetails.buyer !== 'Not specified' && (
+                <div className="bg-gray-50 px-6 py-4 rounded-lg text-center">
+                  <p className="text-2xl text-gray-900 font-extrabold leading-tight">Buyer</p>
+                  <p className="text-lg font-semibold text-gray-900 break-words">{transactionDetails.buyer}</p>
+                </div>
+              )}
+              {transactionDetails.seller !== 'Not specified' && (
+                <div className="bg-gray-50 px-6 py-4 rounded-lg text-center">
+                  <p className="text-2xl text-gray-900 font-extrabold leading-tight">Seller</p>
+                  <p className="text-lg font-semibold text-gray-900 break-words">{transactionDetails.seller}</p>
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* Transaction Details Grid */}
-        <div className="mb-8">
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 text-center">
-              Transaction Details
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Object.entries(transactionDetails).map(([key, value]) => (
-                value !== 'Not specified' && (
-                  <div key={key} className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-600 capitalize">
-                      {key.replace(/([A-Z])/g, ' $1').trim()}:
-                    </span>
-                    <span className="text-sm text-gray-900 mt-1">{value}</span>
-                  </div>
-                )
-              ))}
-            </div>
-          </div>
-        </div>
+        {/* Removed old Transaction Details grid beyond Buyer/Seller per spec */}
 
-        {/* Company Logos with black lines above and below */}
+        {/* Company Logos with black lines above and below (auto-fit) */}
         {displayLogos.length > 0 && (
           <div className="mb-8">
             <div className="border-t-2 border-black mb-4"></div>
-            <div className="flex justify-center items-center space-x-8">
+            <div className="grid grid-cols-3 gap-6 items-center">
               {displayLogos.map((logo, index) => {
                 const logoUrl = logo?.url || logo?.logo_url || logo?.image_url;
                 return (
-                  <img
-                    key={index}
-                    src={logoUrl}
-                    alt={`Company logo ${index + 1}`}
-                    className="w-auto object-contain"
-                    style={{ height: '120px' }}
-                    onError={(e) => {
-                      console.warn(`Failed to load logo ${index + 1}:`, logoUrl);
-                      e.target.style.display = 'none';
-                    }}
-                  />
+                  <div key={index} className="flex justify-center">
+                    <div className="relative w-full" style={{ paddingTop: '75%' }}>
+                      <img
+                        src={logoUrl}
+                        alt={`Company logo ${index + 1}`}
+                        className="absolute inset-0 w-full h-full object-contain"
+                        onError={(e) => {
+                          console.warn(`Failed to load logo ${index + 1}:`, logoUrl);
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  </div>
                 );
               })}
             </div>

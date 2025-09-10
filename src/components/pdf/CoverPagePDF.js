@@ -45,6 +45,17 @@ const styles = StyleSheet.create({
     marginVertical: 14,
     minHeight: 220
   },
+  photoShadow: {
+    width: 400,
+    height: 250,
+    backgroundColor: '#FFFFFF',
+    padding: 10,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    border: '1 solid #E5E5E5'
+  },
   propertyPhoto: {
     width: 380,
     height: 220,
@@ -98,7 +109,11 @@ const styles = StyleSheet.create({
     border: '1 solid #E5E5E5',
     borderRadius: 4,
     minWidth: 160,
-    alignItems: 'center'
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 70,
+    flexGrow: 1,
+    flexBasis: '50%'
   },
   highlightLabel: {
     fontSize: 10,
@@ -181,17 +196,19 @@ const CoverPagePDF = ({
 }) => {
   
   // Merge project data with custom overrides
+  const cover = project?.cover_page_data || {};
+  const proj = project || {};
   const mergedData = {
-    title: customData.title || project?.title || 'CLOSING BINDER',
-    propertyAddress: customData.propertyAddress || project?.property_address || '',
-    propertyDescription: customData.propertyDescription || project?.property_description || '',
-    purchasePrice: customData.purchasePrice || project?.purchase_price || '',
-    closingDate: customData.closingDate || project?.closing_date || '',
-    buyer: customData.buyer || project?.buyer || '',
-    seller: customData.seller || project?.seller || '',
-    escrowAgent: customData.escrowAgent || project?.escrow_agent || '',
-    attorney: customData.attorney || project?.attorney || '',
-    lender: customData.lender || project?.lender || ''
+    title: customData.title || cover.title || project?.title || 'CLOSING BINDER',
+    propertyAddress: customData.propertyAddress || cover.propertyAddress || project?.property_address || '',
+    propertyDescription: customData.propertyDescription || cover.propertyDescription || project?.property_description || '',
+    purchasePrice: customData.purchasePrice || cover.purchasePrice || project?.purchase_price || '',
+    closingDate: customData.closingDate || cover.closingDate || project?.closing_date || '',
+    buyer: customData.buyer || cover.buyer || proj?.buyer || '',
+    seller: customData.seller || cover.seller || proj?.seller || '',
+    escrowAgent: customData.escrowAgent || cover.escrowAgent || proj?.escrow_agent || '',
+    attorney: customData.attorney || cover.attorney || proj?.attorney || '',
+    lender: customData.lender || cover.lender || proj?.lender || ''
   };
 
   // Format purchase price
@@ -214,7 +231,8 @@ const CoverPagePDF = ({
   // FIXED: Property photo URL extraction with multiple fallbacks
   const getPropertyPhotoUrl = () => {
     // Check multiple possible sources for the property photo
-    return project?.property_photo_url || 
+    return cover?.propertyPhotoUrl ||
+           project?.property_photo_url || 
            project?.cover_photo_url || 
            propertyPhoto?.property_photo_url || 
            propertyPhoto?.url ||
@@ -304,80 +322,58 @@ const CoverPagePDF = ({
 
         {/* FIXED: Main Property Photo Section with proper image handling */}
         <View style={styles.photoSection}>
-          {renderSafeImage(
-            propertyPhotoUrl,
-            styles.propertyPhoto,
-            <View style={styles.photoPlaceholder}>
-              <Text style={styles.photoPlaceholderText}>
-                PROPERTY PHOTO{'\n'}
-                Upload a photo using the{'\n'}
-                Property Photo Manager
-              </Text>
-            </View>
-          )}
+          <View style={styles.photoShadow}>
+            {renderSafeImage(
+              propertyPhotoUrl,
+              styles.propertyPhoto,
+              <View style={styles.photoPlaceholder}>
+                <Text style={styles.photoPlaceholderText}>
+                  PROPERTY PHOTO{'\n'}
+                  Upload a photo using the{'\n'}
+                  Property Photo Manager
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Property Description removed per request */}
 
-        {/* Highlights row to mirror client UI: purchase price + closing date under photo */}
-        {(formattedPurchasePrice || mergedData.closingDate) && (
-          <View style={styles.highlightsRow}>
-            {formattedPurchasePrice && (
-              <View style={styles.highlightBox}>
-                <Text style={styles.highlightLabel}>Purchase Price</Text>
-                <Text style={styles.highlightValue}>{formattedPurchasePrice}</Text>
-              </View>
-            )}
-            {mergedData.closingDate && (
-              <View style={styles.highlightBox}>
-                <Text style={styles.highlightLabel}>Closing Date</Text>
-                <Text style={styles.highlightValue}>{formatDate(mergedData.closingDate)}</Text>
-              </View>
-            )}
+        {/* Highlights: Purchase Price, Closing Date, Buyer, Seller */}
+        {(formattedPurchasePrice || mergedData.closingDate || mergedData.buyer || mergedData.seller) && (
+          <View style={{ marginTop: 10, marginBottom: 10 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 16 }}>
+              {formattedPurchasePrice && (
+                <View style={styles.highlightBox}>
+                  <Text style={{...styles.highlightLabel, fontSize: 20, fontWeight: 'bold', color: '#000000'}}>Purchase Price</Text>
+                  <Text style={{...styles.highlightValue, fontSize: 16, fontWeight: 'bold', color: '#000000'}}>{formattedPurchasePrice}</Text>
+                </View>
+              )}
+              {mergedData.closingDate && (
+                <View style={styles.highlightBox}>
+                  <Text style={{...styles.highlightLabel, fontSize: 20, fontWeight: 'bold', color: '#000000'}}>Closing Date</Text>
+                  <Text style={{...styles.highlightValue, fontSize: 16, fontWeight: 'bold', color: '#000000'}}>{formatDate(mergedData.closingDate)}</Text>
+                </View>
+              )}
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 16, marginTop: 8 }}>
+              {mergedData.buyer ? (
+                <View style={styles.highlightBox}>
+                  <Text style={{...styles.highlightLabel, fontSize: 20, fontWeight: 'bold', color: '#000000'}}>Buyer</Text>
+                  <Text style={{...styles.highlightValue, fontSize: 16, fontWeight: 'bold', color: '#000000'}}>{mergedData.buyer}</Text>
+                </View>
+              ) : null}
+              {mergedData.seller ? (
+                <View style={styles.highlightBox}>
+                  <Text style={{...styles.highlightLabel, fontSize: 20, fontWeight: 'bold', color: '#000000'}}>Seller</Text>
+                  <Text style={{...styles.highlightValue, fontSize: 16, fontWeight: 'bold', color: '#000000'}}>{mergedData.seller}</Text>
+                </View>
+              ) : null}
+            </View>
           </View>
         )}
 
-        {/* Transaction Details Grid */}
-        <View style={styles.transactionDetails}>
-          <View style={styles.transactionGrid}>
-            {mergedData.buyer && (
-              <View style={styles.transactionItem}>
-                <Text style={styles.transactionLabel}>Buyer:</Text>
-                <Text style={styles.transactionValue}>{mergedData.buyer}</Text>
-              </View>
-            )}
-            {mergedData.seller && (
-              <View style={styles.transactionItem}>
-                <Text style={styles.transactionLabel}>Seller:</Text>
-                <Text style={styles.transactionValue}>{mergedData.seller}</Text>
-              </View>
-            )}
-            {mergedData.closingDate && (
-              <View style={styles.transactionItem}>
-                <Text style={styles.transactionLabel}>Closing Date:</Text>
-                <Text style={styles.transactionValue}>{formatDate(mergedData.closingDate)}</Text>
-              </View>
-            )}
-            {mergedData.escrowAgent && (
-              <View style={styles.transactionItem}>
-                <Text style={styles.transactionLabel}>Escrow Agent:</Text>
-                <Text style={styles.transactionValue}>{mergedData.escrowAgent}</Text>
-              </View>
-            )}
-            {mergedData.attorney && (
-              <View style={styles.transactionItem}>
-                <Text style={styles.transactionLabel}>Attorney:</Text>
-                <Text style={styles.transactionValue}>{mergedData.attorney}</Text>
-              </View>
-            )}
-            {mergedData.lender && (
-              <View style={styles.transactionItem}>
-                <Text style={styles.transactionLabel}>Lender:</Text>
-                <Text style={styles.transactionValue}>{mergedData.lender}</Text>
-              </View>
-            )}
-          </View>
-        </View>
+        {/* Removed detailed transaction grid beyond Buyer/Seller per spec */}
 
         {/* Company Logos */}
         {safeLogos.length > 0 && (

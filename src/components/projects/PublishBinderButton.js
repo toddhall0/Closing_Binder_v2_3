@@ -3,12 +3,13 @@
 // FIXED VERSION - "Open New Window" button instead of "Copy URL"
 // ===============================
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LoadingSpinner } from '../common/ui/LoadingSpinner';
 import { Button } from '../common/ui/Button';
 import { Input } from '../common/ui/Input';
 import { Modal } from '../common/ui/Modal';
 import { ClientDashboardService } from '../../services/clientDashboardService';
+import ClientsService from '../../services/clientsService';
 
 const PublishBinderButton = ({ project, documents, sections, logos }) => {
   const [showModal, setShowModal] = useState(false);
@@ -16,6 +17,7 @@ const PublishBinderButton = ({ project, documents, sections, logos }) => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [formData, setFormData] = useState({
+    clientId: '',
     clientName: '',
     clientEmail: '',
     expiresAt: '',
@@ -24,6 +26,19 @@ const PublishBinderButton = ({ project, documents, sections, logos }) => {
     includeAllDocuments: true,
     selectedDocuments: []
   });
+
+  const [clientSearch, setClientSearch] = useState('');
+  const [clientOptions, setClientOptions] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+    const run = async () => {
+      const { data } = await ClientsService.getClients(clientSearch);
+      if (active) setClientOptions(data);
+    };
+    run();
+    return () => { active = false; };
+  }, [clientSearch]);
 
   const generateCoverPageData = () => {
     return {
@@ -54,7 +69,7 @@ const PublishBinderButton = ({ project, documents, sections, logos }) => {
   const handlePublish = async (e) => {
     e.preventDefault();
     
-    if (!formData.clientName || !formData.clientEmail) {
+    if (!(formData.clientId || (formData.clientName && formData.clientEmail))) {
       setError('Please fill in all required fields');
       return;
     }
@@ -86,7 +101,9 @@ const PublishBinderButton = ({ project, documents, sections, logos }) => {
           id: doc.id,
           isDownloadable: true,
           isViewable: true
-        }))
+        })),
+        // Optional direct client_id (if selected from list)
+        clientId: formData.clientId || null
       };
 
       const result = await ClientDashboardService.publishBinder(binderData);
@@ -97,7 +114,8 @@ const PublishBinderButton = ({ project, documents, sections, logos }) => {
       
       setSuccess({
         accessCode: result.data.access_code,
-        sharingUrl: ClientDashboardService.generateSharingUrl(result.data.access_code)
+        sharingUrl: ClientDashboardService.generateSharingUrl(result.data.access_code),
+        clientSlug: result.data.client_slug || null
       });
       
       setFormData({
@@ -222,6 +240,40 @@ const PublishBinderButton = ({ project, documents, sections, logos }) => {
             )}
 
             <div className="grid grid-cols-2 gap-4">
+              {/* Client picker */}
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Assign to Client</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Search clients by name or email..."
+                    value={clientSearch}
+                    onChange={(e) => setClientSearch(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded"
+                  />
+                  <select
+                    value={formData.clientId}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      const selected = clientOptions.find(c => c.id === id);
+                      setFormData(prev => ({
+                        ...prev,
+                        clientId: id,
+                        clientName: selected ? selected.name : prev.clientName,
+                        clientEmail: selected ? selected.email : prev.clientEmail
+                      }));
+                    }}
+                    className="px-3 py-2 border border-gray-300 rounded min-w-[220px]"
+                  >
+                    <option value="">Select client...</option>
+                    {clientOptions.map(c => (
+                      <option key={c.id} value={c.id}>{c.name} ({c.email})</option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Or create a new client below.</p>
+              </div>
+
               <Input
                 label="Client Name *"
                 value={formData.clientName}
@@ -311,6 +363,7 @@ const PublishBinderButton = ({ project, documents, sections, logos }) => {
 
 // FIXED: Success View Component with "Open New Window" button
 const SuccessView = ({ success, onOpenWindow, onCopyUrl, onClose }) => {
+  const clientDashboardUrl = success.clientSlug ? `${window.location.origin}/client/${success.clientSlug}` : null;
   return (
     <div className="text-center space-y-6">
       <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
@@ -367,6 +420,37 @@ const SuccessView = ({ success, onOpenWindow, onCopyUrl, onClose }) => {
             </button>
           </div>
         </div>
+
+        {clientDashboardUrl && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Client Dashboard URL
+            </label>
+            <div className="flex items-center space-x-2">
+              <input
+                type="text"
+                value={clientDashboardUrl}
+                readOnly
+                className="flex-1 bg-white px-3 py-2 border border-gray-300 rounded text-sm"
+              />
+              <button
+                onClick={() => onCopyUrl(clientDashboardUrl)}
+                className="px-3 py-2 text-gray-500 hover:text-gray-700 border border-gray-300 rounded text-sm"
+                title="Copy URL"
+              >
+                Copy
+              </button>
+            </div>
+            <div className="pt-3">
+              <button
+                onClick={() => onOpenWindow(clientDashboardUrl)}
+                className="w-full px-4 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
+              >
+                Open Client Dashboard
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* FIXED: Primary "Open New Window" button */}
         <div className="pt-3">

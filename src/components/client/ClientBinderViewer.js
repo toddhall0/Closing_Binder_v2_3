@@ -36,6 +36,7 @@ const ClientBinderViewer = () => {
       }
 
       setBinder(result.data);
+      try { if (typeof window !== 'undefined') { window.__lastBinder = result.data; } } catch {}
       setLogos(result.data.logos || []);
 
       // Track the view
@@ -106,47 +107,86 @@ const ClientBinderViewer = () => {
   };
 
   const ClientContactInfo = () => {
-    const roles = [
+    const baseInfo =
+      binder?.contact_info ||
+      binder?.cover_page_data?.contact_info ||
+      binder?.projects?.contact_info ||
+      binder?.projects?.cover_page_data?.contact_info ||
+      {};
+    const deriveIfEmpty = (existing) => {
+      const hasAny = existing && typeof existing === 'object' && Object.keys(existing).length > 0;
+      if (hasAny) return existing;
+      const flat = {
+        buyer: binder?.buyer || binder?.projects?.buyer || null,
+        seller: binder?.seller || binder?.projects?.seller || null,
+        buyer_attorney: binder?.buyer_attorney || binder?.projects?.buyer_attorney || null,
+        seller_attorney: binder?.seller_attorney || binder?.projects?.seller_attorney || null,
+        buyer_broker: binder?.buyer_broker || binder?.projects?.buyer_broker || null,
+        seller_broker: binder?.seller_broker || binder?.projects?.seller_broker || null,
+        lender: binder?.lender || binder?.projects?.lender || null,
+        title_company: binder?.title_company || binder?.projects?.title_company || null,
+        escrow_agent: binder?.escrow_agent || binder?.projects?.escrow_agent || null
+      };
+      const out = {};
+      Object.entries(flat).forEach(([k, v]) => {
+        if (v) out[k] = { company: v };
+      });
+      return out;
+    };
+    const info = deriveIfEmpty(baseInfo);
+    const leftRoles = [
       { key: 'buyer', label: 'Buyer' },
-      { key: 'seller', label: 'Seller' },
       { key: 'buyer_attorney', label: "Buyer's Attorney" },
-      { key: 'seller_attorney', label: "Seller's Attorney" },
-      { key: 'escrow_agent', label: 'Escrow Agent' },
-      { key: 'title_company', label: 'Title Insurance Company' },
-      { key: 'lender', label: 'Lender' },
       { key: 'buyer_broker', label: "Buyer's Broker" },
+      { key: 'lender', label: 'Lender' },
+      { key: 'title_company', label: 'Title Insurance Company' },
+      { key: 'escrow_agent', label: 'Escrow Agent' },
+    ];
+    const rightRoles = [
+      { key: 'seller', label: 'Seller' },
+      { key: 'seller_attorney', label: "Seller's Attorney" },
       { key: 'seller_broker', label: "Seller's Broker" },
     ];
-    const info = binder?.contact_info || binder?.cover_page_data?.contact_info || {};
+    const renderParty = (role) => {
+      const data = info[role.key] || {};
+      const isNA = !!data.not_applicable;
+      const hasAny = ['company','representative','address','email','phone','web'].some(k => !!data[k]);
+      if (!isNA && !hasAny) return null;
+      return (
+        <div key={role.key} className="border-l-4 border-black pl-4 py-3">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">{role.label}</h3>
+          {isNA ? (
+            <div className="text-sm text-gray-700">None</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+              {data.company && <div><span className="font-medium">Company:</span> {data.company}</div>}
+              {data.representative && <div><span className="font-medium">Representative:</span> {data.representative}</div>}
+              {data.address && <div className="md:col-span-2"><span className="font-medium">Address:</span> {data.address}</div>}
+              {data.email && <div><span className="font-medium">Email:</span> {data.email}</div>}
+              {data.phone && <div><span className="font-medium">Phone:</span> {data.phone}</div>}
+              {data.web && <div className="md:col-span-2"><span className="font-medium">Web:</span> {data.web}</div>}
+            </div>
+          )}
+        </div>
+      );
+    };
     return (
       <div className="max-w-4xl mx-auto bg-white p-6">
+        <div className="mb-4 text-left">
+          <button onClick={() => setCurrentView('toc')} className="text-sm text-blue-600 hover:text-blue-800 underline">
+            <span className="mr-1">&lt;</span>Back to Table of Contents
+          </button>
+        </div>
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold text-black">Contact Information</h1>
         </div>
-        <div className="space-y-8">
-          {roles.map((role) => {
-            const data = info[role.key] || {};
-            const hasAny = ['company','representative','address','email','phone','web'].some(k => !!data[k]);
-            if (!hasAny) return null;
-            return (
-              <div key={role.key} className="border-l-4 border-black pl-4 py-2">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">{role.label}</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                  {data.company && <div><span className="font-medium">Company:</span> {data.company}</div>}
-                  {data.representative && <div><span className="font-medium">Representative:</span> {data.representative}</div>}
-                  {data.address && <div className="md:col-span-2"><span className="font-medium">Address:</span> {data.address}</div>}
-                  {data.email && <div><span className="font-medium">Email:</span> {data.email}</div>}
-                  {data.phone && <div><span className="font-medium">Phone:</span> {data.phone}</div>}
-                  {data.web && <div className="md:col-span-2"><span className="font-medium">Web:</span> {data.web}</div>}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <div className="mt-6 text-left">
-          <button onClick={() => setCurrentView('toc')} className="text-sm text-blue-600 hover:text-blue-800 underline">
-            Back to Table of Contents
-          </button>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-8">
+            {leftRoles.map(renderParty)}
+          </div>
+          <div className="space-y-8">
+            {rightRoles.map(renderParty)}
+          </div>
         </div>
       </div>
     );
@@ -214,20 +254,22 @@ const ClientBinderViewer = () => {
   }
 
   // Extract and normalize documents into flat list with expected fields
-  const documents = (binder.client_binder_documents || binder.documents || []).map((item) => {
-    // If coming from join: { document_id, is_viewable, is_downloadable, documents: { ...actualDoc } }
+  const documentsSource = Array.isArray(binder?.documents) && binder.documents.length > 0
+    ? binder.documents
+    : (binder.client_binder_documents || []);
+
+  const documents = documentsSource.map((item) => {
     const doc = item.documents ? item.documents : item;
     const id = doc.id || item.document_id || item.id;
     const name = doc.name || doc.original_name || doc.display_name;
     const display_name = doc.display_name || doc.original_name || doc.name || 'Unnamed Document';
-    const section_id = doc.section_id || item.section_id || null;
+    const section_id = item.section_id || doc.section_id || null;
     const storage_path = doc.storage_path || doc.file_path || null;
     const file_url = doc.file_url || item.url || null;
 
-    // Build a best-effort URL
     let url = null;
     if (storage_path) {
-      url = `${process.env.REACT_APP_SUPABASE_URL}/storage/v1/object/public/documents/${storage_path}`;
+      url = `${process.env.REACT_APP_SUPABASE_URL}/storage/v1/object/public/documents/${String(storage_path).replace(/^documents\//, '')}`;
     } else if (file_url) {
       url = file_url;
     }
@@ -246,7 +288,7 @@ const ClientBinderViewer = () => {
 
   // Build structure for TOC numbering using binder.table_of_contents_data if available
   const structure = {
-    sections: binder?.table_of_contents_data?.sections || []
+    sections: binder?.table_of_contents_data?.sections || binder?.projects?.table_of_contents_data?.sections || []
   };
 
   // Debug logging to help troubleshoot

@@ -96,6 +96,32 @@ Your complete Routes section should look something like this:
     navigate(`/projects/${project.id}`);
   };
 
+  const getProjectImageUrl = () => {
+    const candidates = [
+      project?.cover_photo_url,
+      project?.property_photo_url,
+      project?.property_data?.photo_url,
+      project?.cover_page_data?.propertyPhotoUrl
+    ];
+    for (const url of candidates) {
+      if (url && typeof url === 'string' && url.trim().length > 0) {
+        return url.trim();
+      }
+    }
+
+    // Fallback: construct from storage naming convention if we only have the filename
+    // Expected storage path: images/<user_id>/projects/<project_id>/photos/<fileName>
+    if (project?.property_photo_name && project?.user_id && project?.id) {
+      const baseUrl = process.env.REACT_APP_SUPABASE_URL;
+      const path = `images/${project.user_id}/projects/${project.id}/photos/${project.property_photo_name}`;
+      return `${baseUrl}/storage/v1/object/public/${path}`;
+    }
+
+    return null;
+  };
+
+  const imageUrl = getProjectImageUrl();
+
   return (
     <div 
       className={`relative bg-white border border-gray-200 rounded-lg hover:border-gray-300 transition-colors cursor-pointer group ${
@@ -105,29 +131,29 @@ Your complete Routes section should look something like this:
     >
       {/* Cover Photo */}
       <div className="aspect-w-16 aspect-h-9 bg-gray-100">
-        {project.cover_photo_url ? (
+        {imageUrl ? (
           <img
-            src={project.cover_photo_url}
+            src={imageUrl}
             alt={project.title}
             className="w-full h-32 object-cover rounded-t-lg"
+            onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling?.classList.remove('hidden'); }}
           />
-        ) : (
-          <div className="w-full h-32 flex items-center justify-center rounded-t-lg">
-            <svg 
-              className="w-12 h-12 text-gray-400" 
-              fill="none" 
-              stroke="currentColor" 
-              viewBox="0 0 24 24"
-            >
-              <path 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                strokeWidth={1} 
-                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" 
-              />
-            </svg>
-          </div>
-        )}
+        ) : null}
+        <div className={`w-full h-32 flex items-center justify-center rounded-t-lg ${imageUrl ? 'hidden' : ''}`}>
+          <svg 
+            className="w-12 h-12 text-gray-400" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={1} 
+              d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" 
+            />
+          </svg>
+        </div>
       </div>
 
       {/* Card Content */}

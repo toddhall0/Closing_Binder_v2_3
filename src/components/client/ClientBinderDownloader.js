@@ -144,27 +144,48 @@ const ClientBinderDownloader = ({
 
       // Step 1: Generate Cover Page PDF
       updateProgress(12, 'Generating cover page...');
+      const cpd = binder?.cover_page_data || binder?.projects?.cover_page_data || {};
+      const effectivePropertyPhotoUrl = cpd.propertyPhotoUrl 
+        || binder?.property_photo_url 
+        || binder?.cover_photo_url 
+        || binder?.projects?.property_photo_url 
+        || binder?.projects?.cover_photo_url 
+        || null;
+
       const coverPageBlob = await pdf(
         React.createElement(CoverPagePDF, {
           project: {
-            title: binder?.title || 'Closing Binder',
-            property_address: binder?.property_address,
-            property_description: binder?.property_description,
-            purchase_price: binder?.purchase_price,
-            closing_date: binder?.closing_date,
+            title: binder?.title || cpd.title || 'Closing Binder',
+            property_address: binder?.property_address || cpd.propertyAddress,
+            property_description: binder?.property_description || cpd.propertyDescription,
+            purchase_price: binder?.purchase_price || cpd.purchasePrice || binder?.projects?.purchase_price,
+            closing_date: binder?.closing_date || cpd.closingDate || binder?.projects?.closing_date,
             loan_amount: binder?.loan_amount,
-            buyer: binder?.buyer,
-            seller: binder?.seller,
-            attorney: binder?.attorney,
-            lender: binder?.lender,
-            title_company: binder?.title_company,
-            escrow_agent: binder?.escrow_agent,
-            cover_photo_url: binder?.cover_photo_url,
-            property_photo_url: binder?.property_photo_url
+            buyer: binder?.buyer || cpd.buyer || binder?.projects?.buyer,
+            seller: binder?.seller || cpd.seller || binder?.projects?.seller,
+            attorney: binder?.attorney || cpd.attorney || binder?.projects?.attorney,
+            lender: binder?.lender || cpd.lender || binder?.projects?.lender,
+            title_company: binder?.title_company || cpd.titleCompany || binder?.projects?.title_company,
+            escrow_agent: binder?.escrow_agent || cpd.escrowAgent || binder?.projects?.escrow_agent,
+            cover_photo_url: binder?.cover_photo_url || effectivePropertyPhotoUrl,
+            property_photo_url: binder?.property_photo_url || effectivePropertyPhotoUrl
           },
           logos: logos,
           propertyPhoto: {
-            property_photo_url: binder?.property_photo_url || binder?.cover_photo_url
+            property_photo_url: effectivePropertyPhotoUrl
+          },
+          customData: {
+            title: cpd.title,
+            propertyAddress: cpd.propertyAddress,
+            propertyDescription: cpd.propertyDescription,
+            purchasePrice: cpd.purchasePrice,
+            closingDate: cpd.closingDate,
+            buyer: cpd.buyer,
+            seller: cpd.seller,
+            escrowAgent: cpd.escrowAgent,
+            attorney: cpd.attorney,
+            lender: cpd.lender,
+            propertyPhotoUrl: cpd.propertyPhotoUrl
           }
         })
       ).toBlob();

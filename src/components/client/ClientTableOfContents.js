@@ -40,7 +40,7 @@ const ClientTableOfContents = ({
       numbered.sections[section.id] = {
         ...section,
         number: sectionNumber,
-        documents: documents.filter(doc => doc.section_id === section.id).map((doc, docIndex) => ({
+        documents: documents.filter(doc => String(doc.section_id || '') === String(section.id)).map((doc, docIndex) => ({
           ...doc,
           number: `${sectionNumber}.${docIndex + 1}`,
           displayName: doc.display_name || doc.original_name || doc.name || doc.title || 'Unnamed Document'
@@ -56,7 +56,7 @@ const ClientTableOfContents = ({
         numbered.sections[section.id].subsections[subsection.id] = {
           ...subsection,
           number: subsectionNumber,
-          documents: documents.filter(doc => doc.section_id === subsection.id).map((doc, docIndex) => ({
+          documents: documents.filter(doc => String(doc.section_id || '') === String(subsection.id)).map((doc, docIndex) => ({
             ...doc,
             number: `${subsectionNumber}.${docIndex + 1}`,
             displayName: doc.display_name || doc.original_name || doc.name || doc.title || 'Unnamed Document'
@@ -169,29 +169,35 @@ const ClientTableOfContents = ({
   return (
     <div className="max-w-4xl mx-auto bg-white p-6">
       {/* Table of Contents Title - exactly like HTML TOC */}
-      <div className="text-center mb-8">
+      <div className="mb-8">
         {onNavigateToCover && (
-          <div className="mb-4 text-left">
+          <div className="mb-4 flex items-center justify-between">
             <button
               onClick={onNavigateToCover}
               className="text-sm text-blue-600 hover:text-blue-800 underline"
             >
-              Back to Cover Page
+              <span className="mr-1">&lt;</span>Back to Cover Page
+            </button>
+            <button
+              onClick={() => (typeof window !== 'undefined') && window.dispatchEvent(new CustomEvent('navigate-client-contact'))}
+              className="text-sm text-blue-600 hover:text-blue-800 underline"
+            >
+              Contact Information<span className="ml-1">&gt;</span>
             </button>
           </div>
         )}
-        <h1 className="text-3xl font-bold text-black mb-4">TABLE OF CONTENTS</h1>
+        <h1 className="text-3xl font-bold text-black mb-4 text-center">TABLE OF CONTENTS</h1>
         
         {/* Project Title */}
         {binder?.title && (
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2 text-center">
             {binder.title}
           </h2>
         )}
         
         {/* Property Address */}
         {binder?.property_address && (
-          <p className="text-lg text-gray-600 mb-2">
+          <p className="text-lg text-gray-600 mb-2 text-center">
             {binder.property_address}
           </p>
         )}
@@ -289,7 +295,7 @@ const ClientTableOfContents = ({
             <div className="border-t-2 border-black"></div>
           </div>
         )}
-        <div className="text-sm text-gray-600 space-y-1">
+        <div className="text-sm text-gray-600 space-y-1 text-center">
           <p>
             <strong>Generated:</strong> {formatDate()}
           </p>
@@ -300,32 +306,8 @@ const ClientTableOfContents = ({
             This table of contents provides quick access to all documents in your closing binder.
           </p>
         </div>
-        <div className="mt-4 text-left">
-          <button
-            onClick={onNavigateToCover}
-            className="text-sm text-blue-600 hover:text-blue-800 underline mr-6"
-          >
-            Back to Cover Page
-          </button>
-          <button
-            onClick={() => (typeof window !== 'undefined') && window.dispatchEvent(new CustomEvent('navigate-client-contact'))}
-            className="text-sm text-blue-600 hover:text-blue-800 underline"
-          >
-            Contact Information
-          </button>
-        </div>
       </div>
 
-      {onNavigateToCover && (
-        <div className="mt-6 text-left">
-          <button
-            onClick={onNavigateToCover}
-            className="text-sm text-blue-600 hover:text-blue-800 underline"
-          >
-            Back to Cover Page
-          </button>
-        </div>
-      )}
     </div>
   );
 };

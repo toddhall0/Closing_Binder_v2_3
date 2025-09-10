@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
 import AuthModal from '../auth/AuthModal';
 import LoadingSpinner from './LoadingSpinner';
 
@@ -9,6 +10,38 @@ const Header = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [role, setRole] = useState(null);
+  const [clientSlug, setClientSlug] = useState(null);
+
+  useEffect(() => {
+    const fetchRole = async () => {
+      if (!user?.email) {
+        setRole(null);
+        setClientSlug(null);
+        return;
+      }
+      try {
+        const email = user.email.toLowerCase();
+        const { data } = await supabase
+          .from('clients')
+          .select('slug')
+          .eq('email', email)
+          .limit(1)
+          .maybeSingle();
+        if (data) {
+          setRole('client');
+          setClientSlug(data.slug);
+        } else {
+          setRole('firm');
+          setClientSlug(null);
+        }
+      } catch {
+        setRole('firm');
+        setClientSlug(null);
+      }
+    };
+    fetchRole();
+  }, [user?.email]);
 
   const handleSignOut = async () => {
     setIsSigningOut(true);
@@ -57,13 +90,22 @@ const Header = () => {
                 <LoadingSpinner size="sm" />
               ) : user ? (
                 <>
-                  {/* Dashboard Link */}
-                  <Link
-                    to="/dashboard"
-                    className="text-gray-700 hover:text-black font-medium focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 rounded-lg px-3 py-2"
-                  >
-                    Dashboard
-                  </Link>
+                  {/* Role-based nav */}
+                  {role === 'firm' ? (
+                    <Link
+                      to="/dashboard"
+                      className="text-gray-700 hover:text-black font-medium focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 rounded-lg px-3 py-2"
+                    >
+                      Firm Dashboard
+                    </Link>
+                  ) : (
+                    <Link
+                      to={clientSlug ? `/client/${clientSlug}` : '/client'}
+                      className="text-gray-700 hover:text-black font-medium focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 rounded-lg px-3 py-2"
+                    >
+                      Client Dashboard
+                    </Link>
+                  )}
 
                   {/* User Menu */}
                   <div className="relative">

@@ -12,6 +12,7 @@ import Dashboard from './components/dashboard/Dashboard';
 import ProjectDetail from './components/projects/ProjectDetail';
 import DocumentViewer from './components/DocumentViewer';
 import ClientBinderViewer from './components/client/ClientBinderViewer';
+import ClientDashboard from './components/client/ClientDashboard';
 import './index.css';
 
 
@@ -34,15 +35,31 @@ function App() {
               <Route 
                 path="/dashboard" 
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={["firm"]}>
                     <Dashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/client" 
+                element={
+                  <ProtectedRoute allowedRoles={["client"]}>
+                    <ClientDashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/client/:slug" 
+                element={
+                  <ProtectedRoute allowedRoles={["client","firm"]}>
+                    <ClientDashboard />
                   </ProtectedRoute>
                 } 
               />
               <Route 
                 path="/projects/:id" 
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={["firm"]}>
                     <ProjectDetail />
                   </ProtectedRoute>
                 } 

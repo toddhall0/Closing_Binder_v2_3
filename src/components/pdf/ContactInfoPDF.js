@@ -27,13 +27,13 @@ const styles = StyleSheet.create({
     color: '#111111',
     borderLeft: '4 solid #000000',
     paddingLeft: 8,
-    marginTop: 12,
-    marginBottom: 8,
+    marginTop: 16,
+    marginBottom: 10,
   },
   row: {
     fontSize: 10,
     color: '#222222',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   label: {
     fontWeight: 'bold',
@@ -55,16 +55,19 @@ const styles = StyleSheet.create({
   },
 });
 
-const roles = [
-  { key: 'buyer', label: "Buyer" },
-  { key: 'seller', label: "Seller" },
+const leftRoles = [
+  { key: 'buyer', label: 'Buyer' },
   { key: 'buyer_attorney', label: "Buyer's Attorney" },
-  { key: 'seller_attorney', label: "Seller's Attorney" },
-  { key: 'escrow_agent', label: "Escrow Agent" },
-  { key: 'title_company', label: "Title Insurance Company" },
-  { key: 'lender', label: "Lender" },
   { key: 'buyer_broker', label: "Buyer's Broker" },
-  { key: 'seller_broker', label: "Seller's Broker" },
+  { key: 'lender', label: 'Lender' },
+  { key: 'title_company', label: 'Title Insurance Company' },
+  { key: 'escrow_agent', label: 'Escrow Agent' }
+];
+
+const rightRoles = [
+  { key: 'seller', label: 'Seller' },
+  { key: 'seller_attorney', label: "Seller's Attorney" },
+  { key: 'seller_broker', label: "Seller's Broker" }
 ];
 
 const getValue = (obj, path) => {
@@ -76,7 +79,12 @@ const getValue = (obj, path) => {
 };
 
 const ContactInfoPDF = ({ project }) => {
-  const contactInfo = project?.contact_info || {};
+  const contactInfo =
+    project?.contact_info ||
+    project?.cover_page_data?.contact_info ||
+    project?.projects?.contact_info ||
+    project?.projects?.cover_page_data?.contact_info ||
+    {};
 
   const renderParty = (role) => {
     const info = contactInfo[role.key] || {};
@@ -120,7 +128,14 @@ const ContactInfoPDF = ({ project }) => {
     <Document>
       <Page size="LETTER" style={styles.page}>
         <Text style={styles.title}>Contact Information</Text>
-        {roles.map(renderParty)}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 16 }}>
+          <View style={{ width: '48%' }}>
+            {leftRoles.map(renderParty)}
+          </View>
+          <View style={{ width: '48%' }}>
+            {rightRoles.map(renderParty)}
+          </View>
+        </View>
         <View style={styles.footer}>
           <Text>Contact Information</Text>
         </View>
