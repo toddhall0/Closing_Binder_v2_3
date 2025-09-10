@@ -97,7 +97,7 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
           seller: projectData.seller || '',
           escrowAgent: projectData.escrow_agent || '',
           purchasePrice: formattedPrice,
-          contact_info: (projectData.cover_page_data && projectData.cover_page_data.contact_info) || {}
+          contact_info: projectData.contact_info || (projectData.cover_page_data && projectData.cover_page_data.contact_info) || {}
         });
 
         setPropertyPhoto({
@@ -205,10 +205,7 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
           seller: coverData.seller || null,
           escrow_agent: coverData.escrowAgent || null,
           purchase_price: priceValue,
-          cover_page_data: {
-            ...(project?.cover_page_data || {}),
-            contact_info: coverData.contact_info
-          },
+          contact_info: coverData.contact_info,
           updated_at: new Date().toISOString()
         })
         .eq('id', project.id);
