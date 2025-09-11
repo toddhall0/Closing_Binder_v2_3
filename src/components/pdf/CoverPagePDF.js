@@ -116,14 +116,15 @@ const styles = StyleSheet.create({
     flexBasis: '50%'
   },
   highlightLabel: {
-    fontSize: 10,
-    color: '#666666',
-    fontWeight: 'bold'
+    fontSize: 12,
+    color: '#000000',
+    fontWeight: 'bold',
+    fontFamily: 'Helvetica-Bold'
   },
   highlightValue: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#111111',
-    fontWeight: 'bold',
+    fontWeight: 'normal',
     marginTop: 2
   },
   transactionDetails: {

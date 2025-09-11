@@ -27,11 +27,12 @@ import { CSS } from '@dnd-kit/utilities';
 import { documentOrganizationService } from '../../../utils/documentOrganizationService';
 
 // Sortable Document Item Component
-const SortableDocumentItem = ({ document, sectionIndex, docIndex, isDragging, sectionNumber }) => {
+const SortableDocumentItem = ({ document, sectionIndex, docIndex, isDragging, sectionNumber, onRename, onDelete }) => {
   const {
     attributes,
     listeners,
     setNodeRef,
+    setActivatorNodeRef,
     transform,
     transition,
   } = useSortable({ id: document.id });
@@ -46,26 +47,67 @@ const SortableDocumentItem = ({ document, sectionIndex, docIndex, isDragging, se
       ref={setNodeRef}
       style={style}
       {...attributes}
-      {...listeners}
-      className={`flex items-center p-3 mb-2 border rounded-lg transition-colors cursor-move ${
+      className={`flex items-center p-3 mb-2 border rounded-lg transition-colors cursor-default ${
         isDragging 
           ? 'bg-white shadow-lg border-blue-300' 
           : 'bg-gray-50 hover:bg-gray-100 border-gray-200'
       }`}
     >
       <div className="flex items-center space-x-2 flex-1">
-        <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-          <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
-        </svg>
+        <span
+          ref={setActivatorNodeRef}
+          {...listeners}
+          className="text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing"
+          title="Drag to move"
+        >
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
+          </svg>
+        </span>
         <span className="text-sm font-medium text-gray-500 min-w-[40px]">
           {sectionNumber ? `${sectionNumber}.${docIndex + 1}` : `${docIndex + 1}`}
         </span>
         <span className="text-sm font-medium text-gray-900 truncate">
-          {document.name}
+          {document.display_name || document.name}
         </span>
         <span className="text-xs text-gray-400 ml-2">
           (ID: {document.id})
         </span>
+      </div>
+      <div className="flex items-center space-x-2" onPointerDown={(e) => { e.stopPropagation(); }} onMouseDown={(e) => { e.stopPropagation(); }}>
+        <button
+          onClick={async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const next = window.prompt('Rename document', document.display_name || document.name || '');
+            if (!next) return;
+            try {
+              await documentOrganizationService.renameDocument(document.id, next);
+              if (onRename) onRename();
+            } catch (e) {
+              alert(e.message || 'Rename failed');
+            }
+          }}
+          className="px-2 py-1 text-xs text-blue-600 border border-blue-200 rounded hover:bg-blue-50"
+        >
+          Edit
+        </button>
+        <button
+          onClick={async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!window.confirm('Delete this document?')) return;
+            try {
+              await documentOrganizationService.deleteDocument(document.id);
+              if (onDelete) onDelete();
+            } catch (e) {
+              alert('Delete not implemented in service');
+            }
+          }}
+          className="px-2 py-1 text-xs text-red-600 border border-red-200 rounded hover:bg-red-50"
+        >
+          Delete
+        </button>
       </div>
     </div>
   );
@@ -461,6 +503,8 @@ const DocumentOrganization = ({ projectId, onStructureChange }) => {
                   docIndex={docIndex}
                   isDragging={activeId === document.id}
                   sectionNumber={sectionNumber}
+                  onRename={loadStructure}
+                  onDelete={loadStructure}
                 />
               ))}
             </SortableContext>
@@ -592,29 +636,35 @@ const DocumentOrganization = ({ projectId, onStructureChange }) => {
               {rootSections.map((section, index) => renderSection(section, index))}
 
               {/* Unorganized Documents - Always show, even when empty */}
-              <div className="bg-white border border-gray-200 rounded-lg">
+              <div className="bg-white border border-gray-200 rounded-lg sticky bottom-0">
                 <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
                   <h3 className="font-medium text-gray-900">Unorganized Documents ({unorganizedDocs.length})</h3>
                 </div>
-
-                <DroppableSection section={{ id: null }}>
-                  {unorganizedDocs.length === 0 ? (
-                    <div className="text-center py-6 text-gray-400 border-2 border-dashed border-gray-200 rounded">
-                      Drop documents here to remove them from sections
-                    </div>
-                  ) : (
-                    unorganizedDocs.map((document, index) => (
-                      <SortableDocumentItem
-                        key={document.id}
-                        document={document}
-                        sectionIndex={null}
-                        docIndex={index}
-                        isDragging={activeId === document.id}
-                        sectionNumber={null}
-                      />
-                    ))
+                <div className="max-h-48 overflow-y-auto">
+                  <DroppableSection section={{ id: null }}>
+                    {unorganizedDocs.length === 0 ? (
+                      <div className="text-center py-6 text-gray-400 border-2 border-dashed border-gray-200 rounded">
+                        Drop documents here to remove them from sections
+                      </div>
+                    ) : (
+                      unorganizedDocs.slice(0, 3).map((document, index) => (
+                        <SortableDocumentItem
+                          key={document.id}
+                          document={document}
+                          sectionIndex={null}
+                          docIndex={index}
+                          isDragging={activeId === document.id}
+                          sectionNumber={null}
+                          onRename={loadStructure}
+                          onDelete={loadStructure}
+                        />
+                      ))
+                    )}
+                  </DroppableSection>
+                  {unorganizedDocs.length > 3 && (
+                    <div className="px-4 py-2 text-xs text-gray-500">Scroll to view more…</div>
                   )}
-                </DroppableSection>
+                </div>
               </div>
             </div>
           </SortableContext>

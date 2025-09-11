@@ -77,6 +77,52 @@ export const documentOrganizationService = {
     }
   },
 
+  // Rename a document (updates display name used in TOCs)
+  async renameDocument(documentId, newDisplayName) {
+    try {
+      const { data, error } = await supabase
+        .from('documents')
+        .update({
+          display_name: newDisplayName,
+          name: newDisplayName,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', documentId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error renaming document:', error);
+        throw new Error(error.message);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in renameDocument:', error);
+      throw error;
+    }
+  },
+
+  // Delete a document
+  async deleteDocument(documentId) {
+    try {
+      const { error } = await supabase
+        .from('documents')
+        .delete()
+        .eq('id', documentId);
+
+      if (error) {
+        console.error('Error deleting document:', error);
+        throw new Error(error.message);
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error in deleteDocument:', error);
+      throw error;
+    }
+  },
+
   // Update document sort order within a section
   async updateDocumentSortOrder(documentId, newSortOrder) {
     try {

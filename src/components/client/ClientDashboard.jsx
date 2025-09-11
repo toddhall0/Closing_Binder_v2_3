@@ -22,6 +22,7 @@ const ClientDashboard = () => {
   const navigate = useNavigate();
   const { slug } = useParams();
   const { user } = useAuth();
+  const [client, setClient] = React.useState(null);
   const { binders, loading, error, filters, updateFilters, clearFilters, refresh } = useClientBinders(slug);
   const [isFirmAdmin, setIsFirmAdmin] = React.useState(false);
 
@@ -41,6 +42,20 @@ const ClientDashboard = () => {
     };
     checkRole();
   }, [slug, user]);
+
+  // Load client details for prominent display
+  React.useEffect(() => {
+    const loadClient = async () => {
+      try {
+        if (!slug) { setClient(null); return; }
+        const { data, error } = await ClientDashboardService.getClientBySlug(slug);
+        if (!error) setClient(data);
+      } catch {
+        setClient(null);
+      }
+    };
+    loadClient();
+  }, [slug]);
 
   const selectedParties = useMemo(() => new Set(filters.parties || []), [filters.parties]);
 
@@ -77,8 +92,17 @@ const ClientDashboard = () => {
           <div className="py-6">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-medium text-gray-900">Your Closing Binders</h1>
-                <p className="mt-1 text-sm text-gray-600">Access your cover page, table of contents, and documents</p>
+                {client?.name ? (
+                  <>
+                    <h1 className="text-3xl font-semibold text-gray-900">{client.name}</h1>
+                    <p className="mt-1 text-sm text-gray-600">Client Dashboard — Your Closing Binders</p>
+                  </>
+                ) : (
+                  <>
+                    <h1 className="text-2xl font-medium text-gray-900">Your Closing Binders</h1>
+                    <p className="mt-1 text-sm text-gray-600">Access your cover page, table of contents, and documents</p>
+                  </>
+                )}
               </div>
               <Button variant="secondary" size="sm" onClick={refresh} disabled={loading}>Refresh</Button>
             </div>

@@ -3,7 +3,7 @@
 // Adds REAL PDF navigation links and "Back to TOC" buttons using pdf-lib
 // ===============================
 
-import { PDFDocument, PDFName, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFString, StandardFonts, rgb } from 'pdf-lib';
 
 export class PDFNavigationEnhancer {
   constructor() {
@@ -154,6 +154,75 @@ export class PDFNavigationEnhancer {
   }
 
   /**
+   * Create PDF outline bookmarks for each registered document start page
+   */
+  async addBookmarks() {
+    if (!this.pdfDoc || this.documentStartPages.size === 0) return;
+
+    const ctx = this.pdfDoc.context;
+    const catalog = this.pdfDoc.catalog;
+
+    // Create /Outlines root
+    const outlinesDict = ctx.obj({ Type: 'Outlines' });
+    const outlinesRef = ctx.register(outlinesDict);
+
+    let firstItemRef = null;
+    let lastItemRef = null;
+    let prevItemRef = null;
+    let count = 0;
+
+    for (const [docName, pageNum] of this.documentStartPages) {
+      const pages = this.pdfDoc.getPages();
+      const pageIndex = Math.max(0, Math.min(pages.length - 1, pageNum - 1));
+      const page = pages[pageIndex];
+
+      // Destination array to the top of the page
+      const destArray = ctx.obj([
+        page.ref,
+        'XYZ',
+        null,
+        null,
+        null
+      ]);
+
+      // Outline item
+      const itemDict = ctx.obj({
+        Title: PDFString.of(docName),
+        Parent: outlinesRef,
+      });
+      // Some viewers prefer /A (action) over /Dest; set both for compatibility
+      const actionDict = ctx.obj({
+        S: PDFName.of('GoTo'),
+        D: destArray,
+      });
+      itemDict.set(PDFName.of('A'), actionDict);
+      itemDict.set(PDFName.of('Dest'), destArray);
+      const itemRef = ctx.register(itemDict);
+
+      // Link prev/next pointers
+      if (prevItemRef) {
+        const prevDict = ctx.lookup(prevItemRef);
+        prevDict.set(PDFName.of('Next'), itemRef);
+        itemDict.set(PDFName.of('Prev'), prevItemRef);
+      }
+
+      if (!firstItemRef) firstItemRef = itemRef;
+      lastItemRef = itemRef;
+      prevItemRef = itemRef;
+      count += 1;
+    }
+
+    if (firstItemRef) {
+      outlinesDict.set(PDFName.of('First'), firstItemRef);
+      outlinesDict.set(PDFName.of('Last'), lastItemRef);
+      outlinesDict.set(PDFName.of('Count'), count);
+      catalog.set(PDFName.of('Outlines'), outlinesRef);
+      // Ask viewers to open with bookmarks panel visible
+      catalog.set(PDFName.of('PageMode'), PDFName.of('UseOutlines'));
+    }
+  }
+
+  /**
    * Process the entire PDF to add navigation features
    */
   async enhanceNavigation() {
@@ -175,6 +244,9 @@ export class PDFNavigationEnhancer {
     for (const [docName, pageNum] of this.documentStartPages) {
       await this.addNamedDestination(docName, pageNum - 1); // Convert to 0-based index
     }
+
+    // Add bookmarks in the sidebar for each document start
+    await this.addBookmarks();
 
     console.log(`Enhanced navigation for ${pages.length} pages with ${this.documentStartPages.size} document destinations`);
   }

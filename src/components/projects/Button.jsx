@@ -16,11 +16,13 @@ export const Button = ({
   const variants = {
     primary: 'bg-black text-white hover:bg-gray-800 focus:ring-black',
     secondary: 'bg-white text-black border border-gray-300 hover:bg-gray-50 focus:ring-gray-500',
-    danger: 'bg-black text-white hover:bg-gray-800 focus:ring-black',
+    info: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-600',
+    danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-600',
     ghost: 'bg-transparent text-black hover:bg-gray-100 focus:ring-gray-500'
   };
   
   const sizes = {
+    xs: 'px-2.5 py-1 text-xs',
     sm: 'px-3 py-1.5 text-sm',
     md: 'px-4 py-2 text-sm',
     lg: 'px-6 py-3 text-base'

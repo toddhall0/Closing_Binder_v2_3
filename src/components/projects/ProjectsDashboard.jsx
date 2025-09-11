@@ -27,6 +27,8 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
   const [selectedProject, setSelectedProject] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [localSearchTerm, setLocalSearchTerm] = useState('');
+  const [localFrom, setLocalFrom] = useState('');
+  const [localTo, setLocalTo] = useState('');
 
   // Debounce search
   useEffect(() => {
@@ -94,10 +96,7 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
   };
 
   // Filter projects based on search (client-side filtering for immediate feedback)
-  const filteredProjects = projects.filter(project =>
-    project.title.toLowerCase().includes(localSearchTerm.toLowerCase()) ||
-    (project.property_address && project.property_address.toLowerCase().includes(localSearchTerm.toLowerCase()))
-  );
+  const filteredProjects = projects;
 
   return (
     <div className="min-h-screen bg-white">
@@ -131,8 +130,8 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Search and Filter Bar */}
-        <div className="mb-8 space-y-4 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
-          <div className="flex-1 max-w-lg">
+        <div className="mb-8 grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+          <div className="sm:col-span-2">
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -149,19 +148,17 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
               />
             </div>
           </div>
-          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Closing From</label>
+            <input type="date" className="block w-full px-3 py-2 border border-gray-300" value={localFrom} onChange={(e)=>setLocalFrom(e.target.value)} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Closing To</label>
+            <input type="date" className="block w-full px-3 py-2 border border-gray-300" value={localTo} onChange={(e)=>setLocalTo(e.target.value)} />
+          </div>
           <div className="flex space-x-3">
-            <Button
-              variant="secondary"
-              onClick={handleRefresh}
-              disabled={loading}
-              size="sm"
-            >
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Refresh
-            </Button>
+            <Button variant="secondary" onClick={()=>{ setLocalSearchTerm(''); setLocalFrom(''); setLocalTo(''); handleSearch('', '', ''); }} disabled={loading} size="sm">Clear</Button>
+            <Button variant="secondary" onClick={handleRefresh} disabled={loading} size="sm">Refresh</Button>
           </div>
         </div>
 

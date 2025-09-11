@@ -42,6 +42,77 @@ class ProjectsService {
   }
 
   /**
+   * Search projects for current user with text query and optional closing date range
+   * @param {Object} filters
+   * @param {string} [filters.query]
+   * @param {string} [filters.from]
+   * @param {string} [filters.to]
+   */
+  static async searchProjects(filters = {}) {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error('User not authenticated');
+
+      let query = supabase
+        .from('projects')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (filters.query && filters.query.trim()) {
+        const like = `%${filters.query.trim()}%`;
+        query = query.or(`title.ilike.${like},property_address.ilike.${like},property_description.ilike.${like}`);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      // Client-side closing date filter (non-ISO safe), using same logic as client binders
+      let list = data || [];
+      if (filters.from || filters.to) {
+        const parseMDY = (s) => {
+          let m = String(s).trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+          if (m) { return { y: Number(m[1]), mo: Number(m[2]), d: Number(m[3]) }; }
+          m = String(s).trim().match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
+          if (m) { let y = Number(m[3]); if (y < 100) y = 2000 + y; return { y, mo: Number(m[1]), d: Number(m[2]) }; }
+          const dt = new Date(s);
+          if (isNaN(dt.getTime())) return null;
+          return { y: dt.getFullYear(), mo: dt.getMonth() + 1, d: dt.getDate() };
+        };
+        const noonMSTUtcTs = ({ y, mo, d }) => Date.UTC(y, mo - 1, d, 19, 0, 0, 0);
+        const startOfDayMSTUtcTs = ({ y, mo, d }) => Date.UTC(y, mo - 1, d, 7, 0, 0, 0);
+        const endOfDayMSTUtcTs = ({ y, mo, d }) => {
+          const t = Date.UTC(y, mo - 1, d, 7, 0, 0, 0);
+          const dt = new Date(t);
+          dt.setUTCDate(dt.getUTCDate() + 1);
+          dt.setUTCHours(6, 59, 59, 999);
+          return dt.getTime();
+        };
+        const closingTs = (val) => {
+          if (!val) return null;
+          const parts = parseMDY(val);
+          if (!parts) return null;
+          return noonMSTUtcTs(parts);
+        };
+        const fromTs = filters.from ? startOfDayMSTUtcTs(parseMDY(filters.from)) : null;
+        const toTs = filters.to ? endOfDayMSTUtcTs(parseMDY(filters.to)) : null;
+        list = list.filter((p) => {
+          const cd = p?.cover_page_data?.closingDate || p?.closing_date || null;
+          const ts = closingTs(cd);
+          if (ts == null) return false;
+          if (fromTs != null && ts < fromTs) return false;
+          if (toTs != null && ts > toTs) return false;
+          return true;
+        });
+      }
+
+      return { data: list, error: null };
+    } catch (error) {
+      return { data: [], error };
+    }
+  }
+
+  /**
    * Get a single project by ID
    * @param {string} projectId - Project ID
    * @returns {Promise<{data: Object|null, error: Error|null}>}

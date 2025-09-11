@@ -4,40 +4,31 @@
 // ===============================
 
 import React, { useState } from 'react';
-import { FileText, Download, Settings, Globe } from 'lucide-react';
+import { FileText, Globe } from 'lucide-react';
 
 // Import components
 import CoverPageEditor from '../pdf/CoverPageEditor';
-import TableOfContentsGenerator from '../pdf/TableOfContentsGenerator';
 import HybridBinderGenerator from '../HybridBinderGenerator';
 
 const GenerateBinder = ({ project, onProjectUpdate }) => {
-  const [activeSection, setActiveSection] = useState('hybrid');
+  const [activeSection, setActiveSection] = useState('cover');
 
   // FIXED: Removed the "complete" section from the array
   const sections = [
     {
-      id: 'hybrid',
-      name: 'Hybrid Binder',
-      icon: Globe,
-      component: HybridBinderGenerator,
-      description: 'Interactive web binder with PDF option'
-    },
-    {
       id: 'cover',
-      name: 'Cover Page',
+      name: 'Property Information Input',
       icon: FileText,
       component: CoverPageEditor,
-      description: 'Design and customize cover page'
+      description: 'Enter and manage property and transaction details'
     },
     {
-      id: 'toc',
-      name: 'Table of Contents',
-      icon: Settings,
-      component: TableOfContentsGenerator,
-      description: 'Generate table of contents'
+      id: 'hybrid',
+      name: 'Generate Binder',
+      icon: Globe,
+      component: HybridBinderGenerator,
+      description: 'Generate the interactive web binder and PDF'
     }
-    
   ];
 
 // ADD THIS LINE TO TEST:

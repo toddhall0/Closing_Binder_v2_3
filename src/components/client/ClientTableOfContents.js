@@ -203,7 +203,7 @@ const ClientTableOfContents = ({
         )}
 
         {/* Purchase Price and Closing Date - exactly like HTML TOC */}
-        <div className="text-sm text-gray-600 space-y-1">
+        <div className="text-sm text-gray-900 space-y-1 font-bold text-center">
           {binder?.purchase_price && (
             <p>Purchase Price: ${binder.purchase_price.toLocaleString()}</p>
           )}

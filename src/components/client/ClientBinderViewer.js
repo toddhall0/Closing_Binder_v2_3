@@ -134,37 +134,29 @@ const ClientBinderViewer = () => {
       return out;
     };
     const info = deriveIfEmpty(baseInfo);
-    const leftRoles = [
-      { key: 'buyer', label: 'Buyer' },
-      { key: 'buyer_attorney', label: "Buyer's Attorney" },
-      { key: 'buyer_broker', label: "Buyer's Broker" },
-      { key: 'lender', label: 'Lender' },
-      { key: 'title_company', label: 'Title Insurance Company' },
-      { key: 'escrow_agent', label: 'Escrow Agent' },
-    ];
-    const rightRoles = [
-      { key: 'seller', label: 'Seller' },
-      { key: 'seller_attorney', label: "Seller's Attorney" },
-      { key: 'seller_broker', label: "Seller's Broker" },
-    ];
-    const renderParty = (role) => {
-      const data = info[role.key] || {};
+    const renderBox = (key, label) => {
+      const data = info[key] || {};
       const isNA = !!data.not_applicable;
-      const hasAny = ['company','representative','address','email','phone','web'].some(k => !!data[k]);
-      if (!isNA && !hasAny) return null;
+      const representativeValue = data.representative || data.representative_name || data.contact || data.name || data.rep || null;
+      const hasAny = !!(data.company || representativeValue || data.address || data.email || data.phone || data.web || (key === 'escrow_agent' && data.file_number));
       return (
-        <div key={role.key} className="border-l-4 border-black pl-4 py-3">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">{role.label}</h3>
-          {isNA ? (
+        <div className="h-full min-h-[180px] border border-gray-200 rounded-lg p-4">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">{label}</h3>
+          {!isNA && !hasAny ? (
+            <div className="text-sm text-gray-500">—</div>
+          ) : isNA ? (
             <div className="text-sm text-gray-700">None</div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+            <div className="grid grid-cols-1 gap-2 text-sm">
               {data.company && <div><span className="font-medium">Company:</span> {data.company}</div>}
-              {data.representative && <div><span className="font-medium">Representative:</span> {data.representative}</div>}
-              {data.address && <div className="md:col-span-2"><span className="font-medium">Address:</span> {data.address}</div>}
+              {(representativeValue) && <div><span className="font-medium">Representative:</span> {representativeValue}</div>}
+              {data.address && <div><span className="font-medium">Address:</span> {data.address}</div>}
               {data.email && <div><span className="font-medium">Email:</span> {data.email}</div>}
               {data.phone && <div><span className="font-medium">Phone:</span> {data.phone}</div>}
-              {data.web && <div className="md:col-span-2"><span className="font-medium">Web:</span> {data.web}</div>}
+              {data.web && <div><span className="font-medium">Web:</span> {data.web}</div>}
+              {key === 'escrow_agent' && data.file_number && (
+                <div><span className="font-medium">File Number:</span> {data.file_number}</div>
+              )}
             </div>
           )}
         </div>
@@ -180,12 +172,26 @@ const ClientBinderViewer = () => {
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold text-black">Contact Information</h1>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="space-y-8">
-            {leftRoles.map(renderParty)}
+        <div className="space-y-6">
+          {/* Row 1: Buyer | Seller */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+            {renderBox('buyer','Buyer')}
+            {renderBox('seller','Seller')}
           </div>
-          <div className="space-y-8">
-            {rightRoles.map(renderParty)}
+          {/* Row 2: Buyer Attorney | Seller Attorney */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+            {renderBox('buyer_attorney',"Buyer's Attorney")}
+            {renderBox('seller_attorney',"Seller's Attorney")}
+          </div>
+          {/* Row 3: Buyer Broker | Seller Broker */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+            {renderBox('buyer_broker',"Buyer's Broker")}
+            {renderBox('seller_broker',"Seller's Broker")}
+          </div>
+          {/* Row 4: Lender | Escrow Agent */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+            {renderBox('lender','Lender')}
+            {renderBox('escrow_agent','Escrow Agent')}
           </div>
         </div>
       </div>

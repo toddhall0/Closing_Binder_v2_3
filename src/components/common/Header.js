@@ -79,8 +79,8 @@ const Header = () => {
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
             <div className="flex items-center">
-              <Link to="/" className="text-xl font-semibold text-black hover:text-gray-800">
-                PDF Closing Binder
+              <Link to="/" className="text-2xl sm:text-3xl font-semibold text-black hover:text-gray-800">
+                The Bundler
               </Link>
             </div>
 

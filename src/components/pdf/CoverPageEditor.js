@@ -476,7 +476,6 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
                         { key: 'buyer_attorney', label: "Buyer's Attorney" },
                         { key: 'buyer_broker', label: "Buyer's Broker" },
                         { key: 'lender', label: 'Lender' },
-                        { key: 'title_company', label: 'Title Insurance Company' },
                         { key: 'escrow_agent', label: 'Escrow Agent' },
                       ].map((role) => {
                         const info = coverData.contact_info[role.key] || {};
@@ -713,53 +712,33 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
                     <h4 className="text-md font-semibold text-gray-900 mb-2">Seller's Broker</h4>
                     {renderContactFields('seller_broker')}
                   </div>
+                  {/* Escrow Agent paired across from Lender */}
+                  <div>
+                    <h4 className="text-md font-semibold text-gray-900 mb-2">Escrow Agent</h4>
+                    <input type="text" value={coverData.escrowAgent} onChange={(e) => setCoverData(prev => ({ ...prev, escrowAgent: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:border-black mb-2" placeholder="Escrow agent name" />
+                    {renderContactFields('escrow_agent')}
+                    <div className="mt-3">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">File Number</label>
+                      <input className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:border-black" value={(coverData.contact_info.escrow_agent && coverData.contact_info.escrow_agent.file_number) || ''} onChange={(e) => {
+                        const val = e.target.value;
+                        setCoverData(prev => ({
+                          ...prev,
+                          contact_info: {
+                            ...prev.contact_info,
+                            escrow_agent: {
+                              ...(prev.contact_info.escrow_agent || {}),
+                              file_number: val
+                            }
+                          }
+                        }));
+                      }} placeholder="e.g., 987654" />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-            {/* Bottom row: Title Company (left) and Escrow Agent (right) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Title Insurance Company</h3>
-                {renderContactFields('title_company')}
-                <div className="mt-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Commitment/Policy Number</label>
-                  <input className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:border-black" value={(coverData.contact_info.title_company && coverData.contact_info.title_company.policy_number) || ''} onChange={(e) => {
-                    const val = e.target.value;
-                    setCoverData(prev => ({
-                      ...prev,
-                      contact_info: {
-                        ...prev.contact_info,
-                        title_company: {
-                          ...(prev.contact_info.title_company || {}),
-                          policy_number: val
-                        }
-                      }
-                    }));
-                  }} placeholder="e.g., 123456" />
-                </div>
-              </div>
-              <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Escrow Agent</h3>
-                <input type="text" value={coverData.escrowAgent} onChange={(e) => setCoverData(prev => ({ ...prev, escrowAgent: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:border-black mb-2" placeholder="Escrow agent name" />
-                {renderContactFields('escrow_agent')}
-                <div className="mt-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">File Number</label>
-                  <input className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:border-black" value={(coverData.contact_info.escrow_agent && coverData.contact_info.escrow_agent.file_number) || ''} onChange={(e) => {
-                    const val = e.target.value;
-                    setCoverData(prev => ({
-                      ...prev,
-                      contact_info: {
-                        ...prev.contact_info,
-                        escrow_agent: {
-                          ...(prev.contact_info.escrow_agent || {}),
-                          file_number: val
-                        }
-                      }
-                    }));
-                  }} placeholder="e.g., 987654" />
-                </div>
-              </div>
-            </div>
+            {/* Bottom row removed (Title Company removed); Lender and Escrow Agent are now paired above */}
+            <div />
           </>
         );
       })()}

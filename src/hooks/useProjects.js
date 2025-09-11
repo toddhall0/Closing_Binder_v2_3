@@ -7,14 +7,16 @@ export const useProjects = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const fetchProjects = useCallback(async () => {
     setLoading(true);
     setError(null);
     
     try {
-      const result = searchTerm 
-        ? await ProjectsService.searchProjects(searchTerm)
+      const result = (searchTerm || dateFrom || dateTo)
+        ? await ProjectsService.searchProjects({ query: searchTerm, from: dateFrom, to: dateTo })
         : await ProjectsService.getAllProjects();
       
       if (result.error) {
@@ -93,8 +95,10 @@ export const useProjects = () => {
     }
   }, []);
 
-  const handleSearch = useCallback((term) => {
-    setSearchTerm(term);
+  const handleSearch = useCallback((term, from, to) => {
+    if (term !== undefined) setSearchTerm(term);
+    if (from !== undefined) setDateFrom(from);
+    if (to !== undefined) setDateTo(to);
   }, []);
 
   const clearError = useCallback(() => {
@@ -114,6 +118,8 @@ export const useProjects = () => {
     loading,
     error,
     searchTerm,
+    dateFrom,
+    dateTo,
     createProject,
     updateProject,
     deleteProject,

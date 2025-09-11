@@ -25,14 +25,15 @@ export class ClientDashboardService {
 
       const accessCode = accessCodeData;
 
-      // Resolve client_id by email (create client if not exists)
-      let clientId = null;
-      if (binderData.clientEmail) {
+      // Resolve client_id preference order: explicit clientId > lookup by email
+      let clientId = binderData.clientId || null;
+      if (!clientId && binderData.clientEmail) {
         const emailLower = binderData.clientEmail.toLowerCase();
         const { data: existingClient } = await supabase
           .from('clients')
           .select('id')
           .eq('email', emailLower)
+          .eq('owner_id', user.id)
           .maybeSingle();
         if (existingClient?.id) {
           clientId = existingClient.id;
@@ -43,7 +44,7 @@ export class ClientDashboardService {
           const slug = `${slugBase}-${Math.random().toString(16).slice(2, 8)}`;
           const { data: newClient, error: clientErr } = await supabase
             .from('clients')
-            .insert({ name, email: emailLower, slug })
+            .insert({ name, email: emailLower, slug, owner_id: user.id })
             .select('id')
             .single();
           if (!clientErr && newClient?.id) {
@@ -57,7 +58,7 @@ export class ClientDashboardService {
         project_id: binderData.projectId,
         user_id: user.id,
         client_name: binderData.clientName,
-        client_email: binderData.clientEmail,
+        client_email: binderData.clientEmail || null,
         client_id: clientId || null,
         access_code: accessCode,
         title: binderData.title,
@@ -76,13 +77,17 @@ export class ClientDashboardService {
       // Upsert: if a binder already exists for this project + client, update it instead of inserting
       let existing = null;
       try {
-        const { data: existingRow } = await supabase
+        let existingQuery = supabase
           .from('client_binders')
           .select('id')
           .eq('project_id', publishData.project_id)
-          .eq('client_email', publishData.client_email)
-          .limit(1)
-          .maybeSingle();
+          .limit(1);
+        if (publishData.client_id) {
+          existingQuery = existingQuery.eq('client_id', publishData.client_id);
+        } else if (publishData.client_email) {
+          existingQuery = existingQuery.eq('client_email', publishData.client_email);
+        }
+        const { data: existingRow } = await existingQuery.maybeSingle();
         existing = existingRow || null;
       } catch {}
 
@@ -214,26 +219,18 @@ export class ClientDashboardService {
       // Not expired
       query = query.or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
 
-      // Date range using published_at if present, else created_at
-      if (filters.from) {
-        query = query.gte('published_at', filters.from);
-      }
-      if (filters.to) {
-        query = query.lte('published_at', filters.to);
-      }
+      // Date range: handle client-side to support multiple formats of closingDate
 
       // State filter fallback: search within address fields if schema lacks state column
       if (filters.state) {
         const like = `%${filters.state}%`;
-        query = query.or(`property_address.ilike.${like},projects.property_address.ilike.${like}`);
+        query = query.or(`property_address.ilike.${like}`);
       }
 
       // Keyword search
       if (filters.query && filters.query.trim().length > 0) {
         const like = `%${filters.query.trim()}%`;
-        query = query.or(
-          `title.ilike.${like},property_address.ilike.${like},property_description.ilike.${like},projects.title.ilike.${like},projects.property_address.ilike.${like}`
-        );
+        query = query.or(`title.ilike.${like},property_address.ilike.${like},property_description.ilike.${like}`);
       }
 
       const { data, error } = await query.order('published_at', { ascending: false });
@@ -299,17 +296,15 @@ export class ClientDashboardService {
         .eq('is_active', true)
         .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
 
-      if (filters.from) query = query.gte('published_at', filters.from);
-      if (filters.to) query = query.lte('published_at', filters.to);
+      if (filters.from) query = query.gte('cover_page_data->>closingDate', filters.from);
+      if (filters.to) query = query.lte('cover_page_data->>closingDate', filters.to);
       if (filters.state) {
         const like = `%${filters.state}%`;
-        query = query.or(`property_address.ilike.${like},projects.property_address.ilike.${like}`);
+        query = query.or(`property_address.ilike.${like}`);
       }
       if (filters.query && filters.query.trim()) {
         const like = `%${filters.query.trim()}%`;
-        query = query.or(
-          `title.ilike.${like},property_address.ilike.${like},property_description.ilike.${like},projects.title.ilike.${like},projects.property_address.ilike.${like}`
-        );
+        query = query.or(`title.ilike.${like},property_address.ilike.${like},property_description.ilike.${like}`);
       }
 
       const { data, error } = await query.order('published_at', { ascending: false });

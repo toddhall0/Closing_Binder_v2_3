@@ -38,7 +38,10 @@ export const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
         />
         
         {/* Modal panel */}
-        <div className={`relative inline-block w-full transform overflow-hidden bg-white text-left shadow-xl transition-all sm:my-8 ${sizeClasses[size]}`}>
+        <div
+          className={`relative inline-block w-full transform overflow-hidden bg-white text-left shadow-xl transition-all sm:my-8 ${sizeClasses[size]}`}
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* Header */}
           {title && (
             <div className="border-b border-gray-200 px-6 py-4">

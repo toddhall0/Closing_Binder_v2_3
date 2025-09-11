@@ -1,7 +1,9 @@
 // src/components/projects/ProjectCard.jsx
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './Button';
+import AssignClientModal from './AssignClientModal';
+import { ClientDashboardService } from '../../services/clientDashboardService';
 
 export const ProjectCard = ({ 
   project, 
@@ -11,6 +13,49 @@ export const ProjectCard = ({
   loading = false 
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [clientName, setClientName] = useState(project?.client?.name || project?.client_name || project?.clientName || project?.client?.company || null);
+  const [clientSlug, setClientSlug] = useState(project?.client?.slug || null);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        if (!clientName && project?.client_id) {
+          const { default: ClientsService } = await import('../../services/clientsService');
+          const { data } = await ClientsService.getById(project.client_id);
+          if (active && data) {
+            if (data.name) setClientName(data.name);
+            if (data.slug) setClientSlug(data.slug);
+          }
+        }
+        // Fallback: check latest client binder for this project to infer client
+        if (!clientName && project?.id) {
+          const { supabase } = await import('../../lib/supabase');
+          const { data: binder } = await supabase
+            .from('client_binders')
+            .select('client_id, client_name')
+            .eq('project_id', project.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (active && binder) {
+            if (binder.client_name && !clientName) setClientName(binder.client_name);
+            if (binder.client_id && !clientSlug) {
+              const { default: ClientsService } = await import('../../services/clientsService');
+              const { data: c } = await ClientsService.getById(binder.client_id);
+              if (active && c?.slug) setClientSlug(c.slug);
+            }
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+    load();
+    return () => { active = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.client_id]);
   const navigate = useNavigate();
 
   const formatDate = (dateString) => {
@@ -19,6 +64,23 @@ export const ProjectCard = ({
       month: 'short',
       day: 'numeric'
     });
+  };
+
+  const formatPrice = (value) => {
+    if (value === null || value === undefined || value === '') return '—';
+    const numeric = typeof value === 'number' ? value : parseFloat(String(value).replace(/[^0-9.]/g, ''));
+    if (!isFinite(numeric)) return String(value);
+    return numeric.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+  };
+
+  const getPurchasePrice = () => {
+    const c = project?.cover_page_data || {};
+    return c.purchasePrice ?? c.purchase_price ?? project?.purchase_price ?? null;
+  };
+
+  const getClosingDate = () => {
+    const c = project?.cover_page_data || {};
+    return c.closingDate ?? c.closing_date ?? project?.closing_date ?? null;
   };
 
 // ===============================
@@ -211,23 +273,89 @@ Your complete Routes section should look something like this:
           </div>
         </div>
 
-        {/* Property Address */}
-        {project.property_address && (
-          <div className="flex items-center text-sm text-gray-600">
-            <svg className="w-4 h-4 mr-2 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <span className="truncate">{project.property_address}</span>
-          </div>
-        )}
+        {/* Client Name */}
+        <div className="text-sm text-gray-700">
+          <span className="font-semibold">Client: </span>
+          {clientName ? (
+            clientSlug ? (
+              <button
+                type="button"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(`${window.location.origin}/client/${clientSlug}`, '_blank', 'noopener,noreferrer'); }}
+                className="text-blue-600 underline"
+              >
+                {clientName}
+              </button>
+            ) : (
+              <span className="truncate align-middle">{clientName}</span>
+            )
+          ) : (
+            <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAssignOpen(true); }} className="text-blue-600 underline">(Assign)</button>
+          )}
+        </div>
 
-        {/* Property Description */}
-        {project.property_description && (
-          <p className="text-sm text-gray-600 line-clamp-2">
-            {project.property_description}
-          </p>
-        )}
+        {/* Project Description */}
+        {project?.description || project?.property_description ? (
+          <div className="text-sm text-gray-600">
+            <span className="font-semibold">Project Description: </span>
+            <span className="line-clamp-2 align-middle">{project?.description || project?.property_description}</span>
+          </div>
+        ) : null}
+
+        {/* Purchase Price and Closing Date */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="text-sm text-gray-700">
+            <div className="font-semibold">Purchase Price:</div>
+            <div>{formatPrice(getPurchasePrice())}</div>
+          </div>
+          <div className="text-sm text-gray-700">
+            <div className="font-semibold">Closing Date:</div>
+            <div>{getClosingDate() ? formatDate(getClosingDate()) : '—'}</div>
+          </div>
+        </div>
+
+        <AssignClientModal
+          isOpen={assignOpen}
+          onClose={() => setAssignOpen(false)}
+          onAssigned={async (client) => {
+            try {
+              const { default: ProjectsService } = await import('../../utils/supabaseProjects');
+              // Optimistically update UI
+              setClientName(client.name);
+              if (client.slug) setClientSlug(client.slug);
+              // Persist to DB if supported; ignore errors to avoid breaking UX
+              await ProjectsService.updateProject(project.id, { client_id: client.id, client_name: client.name });
+              // Ensure an active binder exists for this client+project so it appears in client dashboard
+              try {
+                const result = await ClientDashboardService.publishBinder({
+                  projectId: project.id,
+                  clientId: client.id,
+                  clientName: client.name,
+                  clientEmail: client.email || null,
+                  title: project.title,
+                  propertyAddress: project.property_address,
+                  propertyDescription: project.property_description,
+                  coverPageData: {
+                    title: project?.title || '',
+                    propertyAddress: project?.property_address || '',
+                    propertyDescription: project?.property_description || '',
+                    purchasePrice: project?.purchase_price || '',
+                    closingDate: project?.closing_date || '',
+                    propertyPhotoUrl: project?.property_photo_url || project?.cover_photo_url || ''
+                  },
+                  tableOfContentsData: { sections: [], totalDocuments: 0, generatedAt: new Date().toISOString() },
+                  documents: [],
+                  passwordProtected: false
+                });
+                if (result?.data?.client_slug && !clientSlug) setClientSlug(result.data.client_slug);
+              } catch (e) {
+                // Non-blocking; user can publish later if needed
+              }
+            } catch (err) {
+              console.error('Assign client failed', err);
+              // Keep optimistic UI; publishing binder will fully link client dashboards
+            }
+          }}
+        />
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-2 border-t border-gray-100">

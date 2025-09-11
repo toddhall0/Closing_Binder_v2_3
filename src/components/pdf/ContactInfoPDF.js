@@ -21,14 +21,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
   },
-  sectionHeader: {
-    fontSize: 14,
+  gridRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 16,
+    marginBottom: 12,
+  },
+  cell: {
+    width: '48%',
+    border: '1 solid #E5E5E5',
+    padding: 10,
+    minHeight: 120,
+  },
+  cellTitle: {
+    fontSize: 12,
     fontWeight: 'bold',
-    color: '#111111',
-    borderLeft: '4 solid #000000',
-    paddingLeft: 8,
-    marginTop: 16,
-    marginBottom: 10,
+    color: '#000000',
+    marginBottom: 6,
   },
   row: {
     fontSize: 10,
@@ -38,10 +47,7 @@ const styles = StyleSheet.create({
   label: {
     fontWeight: 'bold',
   },
-  block: {
-    marginBottom: 14,
-    paddingBottom: 6,
-  },
+  
   footer: {
     position: 'absolute',
     left: 56,
@@ -55,19 +61,11 @@ const styles = StyleSheet.create({
   },
 });
 
-const leftRoles = [
-  { key: 'buyer', label: 'Buyer' },
-  { key: 'buyer_attorney', label: "Buyer's Attorney" },
-  { key: 'buyer_broker', label: "Buyer's Broker" },
-  { key: 'lender', label: 'Lender' },
-  { key: 'title_company', label: 'Title Insurance Company' },
-  { key: 'escrow_agent', label: 'Escrow Agent' }
-];
-
-const rightRoles = [
-  { key: 'seller', label: 'Seller' },
-  { key: 'seller_attorney', label: "Seller's Attorney" },
-  { key: 'seller_broker', label: "Seller's Broker" }
+const pairs = [
+  ['buyer', 'seller'],
+  ['buyer_attorney', 'seller_attorney'],
+  ['buyer_broker', 'seller_broker'],
+  ['lender', 'escrow_agent']
 ];
 
 const getValue = (obj, path) => {
@@ -86,25 +84,34 @@ const ContactInfoPDF = ({ project }) => {
     project?.projects?.cover_page_data?.contact_info ||
     {};
 
-  const renderParty = (role) => {
-    const info = contactInfo[role.key] || {};
-    const hasAny = [
-      'company','representative','address','email','phone','web'
-    ].some((f) => !!info[f]);
+  const titleMap = {
+    buyer: 'Buyer',
+    seller: 'Seller',
+    buyer_attorney: "Buyer's Attorney",
+    seller_attorney: "Seller's Attorney",
+    buyer_broker: "Buyer's Broker",
+    seller_broker: "Seller's Broker",
+    lender: 'Lender',
+    escrow_agent: 'Escrow Agent'
+  };
+
+  const renderCell = (key) => {
+    const info = contactInfo[key] || {};
+    const representativeValue = info.representative || info.representative_name || info.contact || info.name || info.rep || null;
+    const hasAny = !!(info.company || representativeValue || info.address || info.email || info.phone || info.web || (key === 'escrow_agent' && info.file_number));
     const isNA = !!info.not_applicable;
-    if (!hasAny && !isNA) return null;
     return (
-      <View key={role.key} style={styles.block} wrap={false}>
-        <Text style={styles.sectionHeader}>{role.label}</Text>
+      <View style={styles.cell} wrap={false}>
+        <Text style={styles.cellTitle}>{titleMap[key] || key}</Text>
         {isNA ? (
-          <Text style={styles.row}><Text style={styles.label}>{role.label}: </Text>None</Text>
-        ) : (
+          <Text style={styles.row}>None</Text>
+        ) : hasAny ? (
           <>
             {info.company && (
               <Text style={styles.row}><Text style={styles.label}>Company: </Text>{info.company}</Text>
             )}
-            {info.representative && (
-              <Text style={styles.row}><Text style={styles.label}>Representative: </Text>{info.representative}</Text>
+            {representativeValue && (
+              <Text style={styles.row}><Text style={styles.label}>Representative: </Text>{representativeValue}</Text>
             )}
             {info.address && (
               <Text style={styles.row}><Text style={styles.label}>Address: </Text>{info.address}</Text>
@@ -118,7 +125,12 @@ const ContactInfoPDF = ({ project }) => {
             {info.web && (
               <Text style={styles.row}><Text style={styles.label}>Web: </Text>{info.web}</Text>
             )}
+            {key === 'escrow_agent' && info.file_number && (
+              <Text style={styles.row}><Text style={styles.label}>File Number: </Text>{info.file_number}</Text>
+            )}
           </>
+        ) : (
+          <Text style={styles.row}>—</Text>
         )}
       </View>
     );
@@ -128,14 +140,12 @@ const ContactInfoPDF = ({ project }) => {
     <Document>
       <Page size="LETTER" style={styles.page}>
         <Text style={styles.title}>Contact Information</Text>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 16 }}>
-          <View style={{ width: '48%' }}>
-            {leftRoles.map(renderParty)}
+        {pairs.map(([l, r], idx) => (
+          <View key={idx} style={styles.gridRow}>
+            {renderCell(l)}
+            {renderCell(r)}
           </View>
-          <View style={{ width: '48%' }}>
-            {rightRoles.map(renderParty)}
-          </View>
-        </View>
+        ))}
         <View style={styles.footer}>
           <Text>Contact Information</Text>
         </View>

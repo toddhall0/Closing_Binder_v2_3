@@ -14,11 +14,9 @@ const styles = StyleSheet.create({
     paddingBottom: 56,
     fontFamily: 'Helvetica',
   },
-  header: {
-    marginBottom: 24,
-  },
-  headerInfo: {
-    textAlign: 'center',
+  headerSpacer: {
+    height: 40,
+    marginBottom: 12,
   },
   projectTitle: {
     fontSize: 16,
@@ -31,15 +29,14 @@ const styles = StyleSheet.create({
     color: '#4A4A4A',
   },
   tocTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#000000',
     textAlign: 'center',
-    marginBottom: 12,
   },
   projectMeta: {
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   projectTitle: {
     fontSize: 16,
@@ -59,28 +56,39 @@ const styles = StyleSheet.create({
   sectionContainer: {
     marginBottom: 12,
   },
-  sectionHeader: {
+  sectionHeaderContainer: {
+    backgroundColor: '#F3F4F6', // gray-100
+    borderLeft: '4 solid #000000',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+  },
+  sectionHeaderText: {
     fontSize: 14,
     fontWeight: 'bold',
     color: '#000000',
-    marginBottom: 10,
-    paddingBottom: 5,
-    borderBottom: '1px solid #F5F5F5',
   },
   subsectionContainer: {
     marginLeft: 16,
     marginBottom: 10,
   },
-  subsectionHeader: {
+  subsectionHeaderContainer: {
+    backgroundColor: '#F9FAFB', // gray-50
+    borderLeft: '4 solid #000000',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    marginBottom: 6,
+  },
+  subsectionHeaderText: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: '#4A4A4A',
-    marginBottom: 8,
+    color: '#111111',
   },
   documentRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 3,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
   },
   documentRowSubsection: {
     marginLeft: 36,
@@ -125,22 +133,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#4A4A4A',
   },
-  bottomLogos: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderTop: '2 solid #000000',
-    position: 'absolute',
-    left: 56,
-    right: 56,
-    bottom: 70,
-  },
-  logo: {
-    maxWidth: 180,
-    maxHeight: 90,
-    objectFit: 'contain',
-  },
+  // logos removed per request
   instructionBox: {
     backgroundColor: '#F5F5F5',
     padding: 10,
@@ -286,6 +279,7 @@ const TableOfContentsPDF = ({
           styles.documentRow, 
           isSubsection && styles.documentRowSubsection
         ]}
+        wrap={false}
       >
         <Text style={styles.docNumberCell}>{doc.number}</Text>
         <View style={styles.docNameCell}>
@@ -313,8 +307,8 @@ const TableOfContentsPDF = ({
           TOC
         </Text>
 
-        {/* Header */}
-        <View style={styles.header}>
+        {/* Header - shown on first page */}
+        <View fixed>
           <Text style={styles.tocTitle}>TABLE OF CONTENTS</Text>
           <View style={styles.projectMeta}>
             {!!project?.title && (
@@ -330,23 +324,28 @@ const TableOfContentsPDF = ({
             </Text>
           </View>
         </View>
+        <View style={styles.headerSpacer} />
 
         {/* Organized Sections */}
         {Object.values(numberedStructure.sections).map((section) => (
-          <View key={section.id} style={styles.sectionContainer}>
-            <Text style={styles.sectionHeader}>
-              {section.number}. {section.name}
-            </Text>
+          <View key={section.id} style={styles.sectionContainer} wrap={false}>
+            <View style={styles.sectionHeaderContainer}>
+              <Text style={styles.sectionHeaderText}>
+                {section.number}. {section.name}
+              </Text>
+            </View>
             
             {/* Section Documents */}
             {section.documents.map(doc => renderDocument(doc))}
             
             {/* Subsections */}
             {Object.values(section.subsections).map((subsection) => (
-              <View key={subsection.id} style={styles.subsectionContainer}>
-                <Text style={styles.subsectionHeader}>
-                  {subsection.number} {subsection.name}
-                </Text>
+              <View key={subsection.id} style={styles.subsectionContainer} wrap={false}>
+                <View style={styles.subsectionHeaderContainer}>
+                  <Text style={styles.subsectionHeaderText}>
+                    {subsection.number} {subsection.name}
+                  </Text>
+                </View>
                 {subsection.documents.map(doc => renderDocument(doc, true))}
               </View>
             ))}
@@ -361,12 +360,7 @@ const TableOfContentsPDF = ({
           </View>
         )}
 
-        {/* Bottom logos and footer */}
-        {logos && logos.length > 0 && (
-          <View style={styles.bottomLogos}>
-            {renderLogos()}
-          </View>
-        )}
+        {/* Footer only; logos removed to avoid overlap */}
         <View style={styles.footer}>
           <Text>
             <Text style={{ fontWeight: 'bold' }}>Generated:</Text> {new Date().toLocaleDateString()}
