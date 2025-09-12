@@ -3,10 +3,56 @@ import React, { useState, useEffect } from 'react';
 import { useProjects } from '../../hooks/useProjects';
 import { ProjectCard } from './ProjectCard';
 import { CreateProjectModal } from './CreateProjectModal';
+import { EditProjectModal } from './EditProjectModal';
 import { ConfirmationDialog } from './ConfirmationDialog';
 import { Button } from './Button';
 // Removed unused Input import
 import { LoadingSpinner } from './LoadingSpinner';
+import { ClientsService } from '../../services/clientsService';
+
+const ClientSelect = ({ value, onChange }) => {
+  const [options, setOptions] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [term, setTerm] = React.useState('');
+
+  React.useEffect(() => {
+    let active = true;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const { data } = await ClientsService.getClients(term);
+        if (active) setOptions(data || []);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    load();
+    return () => { active = false; };
+  }, [term]);
+
+  return (
+    <div>
+      <input
+        type="text"
+        value={term}
+        onChange={(e)=>setTerm(e.target.value)}
+        placeholder="Search clients..."
+        className="block w-full px-3 py-2 border border-gray-300 mb-2"
+      />
+      <select
+        className="block w-full px-3 py-2 border border-gray-300"
+        value={value || ''}
+        onChange={(e)=>onChange(e.target.value)}
+      >
+        <option value="">All clients</option>
+        {options.map(c => (
+          <option key={c.id} value={c.id}>{c.name}</option>
+        ))}
+      </select>
+      {loading && <div className="text-xs text-gray-500 mt-1">Loading...</div>}
+    </div>
+  );
+};
 
 
 
@@ -16,28 +62,34 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
     loading,
     error,
     createProject,
+    updateProject,
     deleteProject,
     handleSearch,
     clearError,
-    refreshProjects
+    refreshProjects,
+    clientId
   } = useProjects();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [localSearchTerm, setLocalSearchTerm] = useState('');
   const [localFrom, setLocalFrom] = useState('');
   const [localTo, setLocalTo] = useState('');
+  const [localClientId, setLocalClientId] = useState('');
 
-  // Debounce search
+  useEffect(() => { setLocalClientId(clientId || ''); }, [clientId]);
+
+  // Debounce search and date filters
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      handleSearch(localSearchTerm);
+      handleSearch(localSearchTerm, localFrom, localTo, localClientId);
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [localSearchTerm, handleSearch]);
+  }, [localSearchTerm, localFrom, localTo, handleSearch]);
 
   const handleCreateProject = async (projectData) => {
     setActionLoading(true);
@@ -57,10 +109,8 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
   };
 
   const handleEditProject = (project) => {
-    // For now, we'll just log this. In a full implementation,
-    // you'd open an edit modal similar to create modal
-    console.log('Edit project:', project);
-    // TODO: Implement edit functionality
+    setSelectedProject(project);
+    setIsEditModalOpen(true);
   };
 
   const handleDeleteConfirm = async () => {
@@ -130,7 +180,7 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Search and Filter Bar */}
-        <div className="mb-8 grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+        <div className="mb-8 grid grid-cols-1 sm:grid-cols-5 gap-4 items-end">
           <div className="sm:col-span-2">
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -144,20 +194,33 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
                 value={localSearchTerm}
                 onChange={(e) => setLocalSearchTerm(e.target.value)}
                 className="block w-full pl-10 pr-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
-                disabled={loading}
               />
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Closing From</label>
-            <input type="date" className="block w-full px-3 py-2 border border-gray-300" value={localFrom} onChange={(e)=>setLocalFrom(e.target.value)} />
+            <input
+              type="date"
+              className="block w-full px-3 py-2 border border-gray-300"
+              value={localFrom}
+              onChange={(e)=>{ const v = e.target.value; setLocalFrom(v); handleSearch(localSearchTerm, v, localTo, localClientId); }}
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Closing To</label>
-            <input type="date" className="block w-full px-3 py-2 border border-gray-300" value={localTo} onChange={(e)=>setLocalTo(e.target.value)} />
+            <input
+              type="date"
+              className="block w-full px-3 py-2 border border-gray-300"
+              value={localTo}
+              onChange={(e)=>{ const v = e.target.value; setLocalTo(v); handleSearch(localSearchTerm, localFrom, v, localClientId); }}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
+            <ClientSelect value={localClientId} onChange={(v)=>{ setLocalClientId(v); handleSearch(localSearchTerm, localFrom, localTo, v); }} />
           </div>
           <div className="flex space-x-3">
-            <Button variant="secondary" onClick={()=>{ setLocalSearchTerm(''); setLocalFrom(''); setLocalTo(''); handleSearch('', '', ''); }} disabled={loading} size="sm">Clear</Button>
+            <Button variant="secondary" onClick={()=>{ setLocalSearchTerm(''); setLocalFrom(''); setLocalTo(''); setLocalClientId(''); handleSearch('', '', '', ''); }} disabled={loading} size="sm">Clear</Button>
             <Button variant="secondary" onClick={handleRefresh} disabled={loading} size="sm">Refresh</Button>
           </div>
         </div>
@@ -242,6 +305,23 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onCreateProject={handleCreateProject}
+        loading={actionLoading}
+      />
+
+      {/* Edit Project Modal */}
+      <EditProjectModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        project={selectedProject}
+        onUpdateProject={async (id, updates) => {
+          setActionLoading(true);
+          try {
+            const result = await updateProject(id, updates);
+            return result;
+          } finally {
+            setActionLoading(false);
+          }
+        }}
         loading={actionLoading}
       />
 

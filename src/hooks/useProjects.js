@@ -9,14 +9,15 @@ export const useProjects = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [clientId, setClientId] = useState('');
 
   const fetchProjects = useCallback(async () => {
     setLoading(true);
     setError(null);
     
     try {
-      const result = (searchTerm || dateFrom || dateTo)
-        ? await ProjectsService.searchProjects({ query: searchTerm, from: dateFrom, to: dateTo })
+      const result = (searchTerm || dateFrom || dateTo || clientId)
+        ? await ProjectsService.searchProjects({ query: searchTerm, from: dateFrom, to: dateTo, clientId })
         : await ProjectsService.getAllProjects();
       
       if (result.error) {
@@ -30,7 +31,7 @@ export const useProjects = () => {
     } finally {
       setLoading(false);
     }
-  }, [searchTerm]);
+  }, [searchTerm, dateFrom, dateTo, clientId]);
 
   const createProject = useCallback(async (projectData) => {
     setError(null);
@@ -95,10 +96,11 @@ export const useProjects = () => {
     }
   }, []);
 
-  const handleSearch = useCallback((term, from, to) => {
+  const handleSearch = useCallback((term, from, to, client) => {
     if (term !== undefined) setSearchTerm(term);
     if (from !== undefined) setDateFrom(from);
     if (to !== undefined) setDateTo(to);
+    if (client !== undefined) setClientId(client);
   }, []);
 
   const clearError = useCallback(() => {
@@ -120,6 +122,7 @@ export const useProjects = () => {
     searchTerm,
     dateFrom,
     dateTo,
+    clientId,
     createProject,
     updateProject,
     deleteProject,

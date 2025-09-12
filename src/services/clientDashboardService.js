@@ -205,6 +205,20 @@ export class ClientDashboardService {
         throw new Error('User not authenticated');
       }
 
+      const toISO = (s) => {
+        if (!s) return null;
+        const t = String(s).trim();
+        if (/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0, 10);
+        const m = t.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
+        if (m) {
+          let y = Number(m[3]); if (y < 100) y = 2000 + y;
+          const mo = String(m[1]).padStart(2, '0');
+          const d = String(m[2]).padStart(2, '0');
+          return `${y}-${mo}-${d}`;
+        }
+        return t;
+      };
+
       let query = supabase
         .from('client_binders')
         .select(`
@@ -219,7 +233,23 @@ export class ClientDashboardService {
       // Not expired
       query = query.or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
 
-      // Date range: handle client-side to support multiple formats of closingDate
+      // Date range: server-side on normalized date column (ensure ISO format)
+      const fromISO = toISO(filters.from);
+      const toISOVal = toISO(filters.to);
+      if (fromISO || toISOVal) query = query.not('closing_date_date', 'is', null);
+      // Per request: treat "from" as selected day + 1 to avoid timezone edge cases
+      const plusOne = (iso) => {
+        if (!iso) return null;
+        const d = new Date(iso + 'T00:00:00Z');
+        d.setUTCDate(d.getUTCDate() + 1);
+        const y = d.getUTCFullYear();
+        const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+        const dd = String(d.getUTCDate()).padStart(2, '0');
+        return `${y}-${m}-${dd}`;
+      };
+      const fromPlusOne = plusOne(fromISO);
+      if (fromPlusOne) query = query.gte('closing_date_date', fromPlusOne);
+      if (toISOVal) query = query.lte('closing_date_date', toISOVal);
 
       // State filter fallback: search within address fields if schema lacks state column
       if (filters.state) {
@@ -285,6 +315,20 @@ export class ClientDashboardService {
       const { data: client, error: clientErr } = await this.getClientBySlug(slug);
       if (clientErr || !client) throw new Error('Client not found');
 
+      const toISO = (s) => {
+        if (!s) return null;
+        const t = String(s).trim();
+        if (/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0, 10);
+        const m = t.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
+        if (m) {
+          let y = Number(m[3]); if (y < 100) y = 2000 + y;
+          const mo = String(m[1]).padStart(2, '0');
+          const d = String(m[2]).padStart(2, '0');
+          return `${y}-${mo}-${d}`;
+        }
+        return t;
+      };
+
       let query = supabase
         .from('client_binders')
         .select(`
@@ -296,8 +340,21 @@ export class ClientDashboardService {
         .eq('is_active', true)
         .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
 
-      if (filters.from) query = query.gte('cover_page_data->>closingDate', filters.from);
-      if (filters.to) query = query.lte('cover_page_data->>closingDate', filters.to);
+      const fromISO = toISO(filters.from);
+      const toISOVal = toISO(filters.to);
+      if (fromISO || toISOVal) query = query.not('closing_date_date', 'is', null);
+      const plusOne = (iso) => {
+        if (!iso) return null;
+        const d = new Date(iso + 'T00:00:00Z');
+        d.setUTCDate(d.getUTCDate() + 1);
+        const y = d.getUTCFullYear();
+        const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+        const dd = String(d.getUTCDate()).padStart(2, '0');
+        return `${y}-${m}-${dd}`;
+      };
+      const fromPlusOne = plusOne(fromISO);
+      if (fromPlusOne) query = query.gte('closing_date_date', fromPlusOne);
+      if (toISOVal) query = query.lte('closing_date_date', toISOVal);
       if (filters.state) {
         const like = `%${filters.state}%`;
         query = query.or(`property_address.ilike.${like}`);

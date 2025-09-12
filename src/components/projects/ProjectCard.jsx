@@ -21,6 +21,7 @@ export const ProjectCard = ({
     let active = true;
     const load = async () => {
       try {
+        // If explicitly assigned, resolve client display info from clients table
         if (!clientName && project?.client_id) {
           const { default: ClientsService } = await import('../../services/clientsService');
           const { data } = await ClientsService.getById(project.client_id);
@@ -29,25 +30,7 @@ export const ProjectCard = ({
             if (data.slug) setClientSlug(data.slug);
           }
         }
-        // Fallback: check latest client binder for this project to infer client
-        if (!clientName && project?.id) {
-          const { supabase } = await import('../../lib/supabase');
-          const { data: binder } = await supabase
-            .from('client_binders')
-            .select('client_id, client_name')
-            .eq('project_id', project.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (active && binder) {
-            if (binder.client_name && !clientName) setClientName(binder.client_name);
-            if (binder.client_id && !clientSlug) {
-              const { default: ClientsService } = await import('../../services/clientsService');
-              const { data: c } = await ClientsService.getById(binder.client_id);
-              if (active && c?.slug) setClientSlug(c.slug);
-            }
-          }
-        }
+        // Do NOT infer client from binders when project has no client_id; keep as Unassigned
       } catch (e) {
         // ignore
       }
@@ -56,14 +39,33 @@ export const ProjectCard = ({
     return () => { active = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.client_id]);
+
+  // Clear cached client display when project becomes unassigned
+  useEffect(() => {
+    if (!project?.client_id) {
+      setClientName(null);
+      setClientSlug(null);
+    }
+  }, [project?.client_id]);
   const navigate = useNavigate();
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    if (!dateString) return '—';
+    const s = String(dateString).trim();
+    const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (m) {
+      const y = Number(m[1]);
+      const mo = Number(m[2]);
+      const d = Number(m[3]);
+      // Construct local date to avoid UTC timezone shift rendering as previous day
+      const dt = new Date(y, mo - 1, d);
+      return dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+    const dt = new Date(s);
+    if (!isNaN(dt.getTime())) {
+      return dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+    return s;
   };
 
   const formatPrice = (value) => {

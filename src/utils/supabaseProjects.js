@@ -61,13 +61,40 @@ class ProjectsService {
 
       if (filters.query && filters.query.trim()) {
         const like = `%${filters.query.trim()}%`;
-        query = query.or(`title.ilike.${like},property_address.ilike.${like},property_description.ilike.${like}`);
+        query = query.or(`title.ilike.${like},property_address.ilike.${like},property_description.ilike.${like},client_name.ilike.${like}`);
       }
+
+      if (filters.clientId && String(filters.clientId).trim()) {
+        query = query.eq('client_id', filters.clientId);
+      }
+
+      // Apply server-side date range using projects.closing_date (stored as ISO-like string)
+      const mkYMD = (s) => {
+        const m1 = String(s).trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+        if (m1) return `${m1[1]}-${String(m1[2]).padStart(2,'0')}-${String(m1[3]).padStart(2,'0')}`;
+        const m2 = String(s).trim().match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
+        if (m2) {
+          let y = Number(m2[3]); if (y < 100) y = 2000 + y;
+          const mo = String(m2[1]).padStart(2,'0');
+          const d = String(m2[2]).padStart(2,'0');
+          return `${y}-${mo}-${d}`;
+        }
+        const dt = new Date(s);
+        if (!isNaN(dt.getTime())) {
+          return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}`;
+        }
+        return null;
+      };
+
+      const fromY = filters.from ? mkYMD(filters.from) : null;
+      const toY = filters.to ? mkYMD(filters.to) : null;
+      if (fromY) query = query.gte('closing_date', fromY);
+      if (toY) query = query.lte('closing_date', toY);
 
       const { data, error } = await query;
       if (error) throw error;
 
-      // Client-side closing date filter (non-ISO safe), using same logic as client binders
+      // Hybrid client-side closing date filter with fallback
       let list = data || [];
       if (filters.from || filters.to) {
         const parseMDY = (s) => {
@@ -88,22 +115,49 @@ class ProjectsService {
           dt.setUTCHours(6, 59, 59, 999);
           return dt.getTime();
         };
-        const closingTs = (val) => {
-          if (!val) return null;
-          const parts = parseMDY(val);
-          if (!parts) return null;
-          return noonMSTUtcTs(parts);
+        const toYMD = ({ y, mo, d }) => {
+          const mm = String(mo).padStart(2, '0');
+          const dd = String(d).padStart(2, '0');
+          return `${y}-${mm}-${dd}`;
         };
-        const fromTs = filters.from ? startOfDayMSTUtcTs(parseMDY(filters.from)) : null;
-        const toTs = filters.to ? endOfDayMSTUtcTs(parseMDY(filters.to)) : null;
+        const closingYMD = (project) => {
+          // Mirror ProjectCard precedence: cover_page_data -> project.closing_date -> closing_date_date
+          let cpd = project?.cover_page_data;
+          if (typeof cpd === 'string') {
+            try { cpd = JSON.parse(cpd); } catch (_) { /* ignore */ }
+          }
+          if (cpd && typeof cpd === 'object') {
+            const dateStr = cpd.closingDate || cpd.closing_date || cpd.ClosingDate || null;
+            if (dateStr) {
+              const parts = parseMDY(String(dateStr).trim());
+              if (parts) return toYMD(parts);
+            }
+          }
+          if (project?.closing_date) {
+            const parts = parseMDY(String(project.closing_date).trim());
+            if (parts) return toYMD(parts);
+          }
+          if (project?.closing_date_date) {
+            const parts = parseMDY(String(project.closing_date_date).trim());
+            if (parts) return toYMD(parts);
+          }
+          return null;
+        };
+        // Treat From as inclusive start of selected day (MST) and To as inclusive end of day
+        const parsedFrom = filters.from ? parseMDY(String(filters.from).trim()) : null;
+        const parsedTo = filters.to ? parseMDY(String(filters.to).trim()) : null;
+        const fromYMD = parsedFrom ? toYMD(parsedFrom) : null;
+        const toYMDStr = parsedTo ? toYMD(parsedTo) : null;
+        const debugItems = [];
         list = list.filter((p) => {
-          const cd = p?.cover_page_data?.closingDate || p?.closing_date || null;
-          const ts = closingTs(cd);
-          if (ts == null) return false;
-          if (fromTs != null && ts < fromTs) return false;
-          if (toTs != null && ts > toTs) return false;
+          const ymd = closingYMD(p);
+          debugItems.push({ id: p.id, ymd });
+          if (!ymd) return false;
+          if (fromYMD && ymd < fromYMD) return false;
+          if (toYMDStr && ymd > toYMDStr) return false;
           return true;
         });
+        try { if (typeof window !== 'undefined') { window.__projectsDateFilter = { fromYMD, toYMD: toYMDStr, items: debugItems }; } } catch(_) {}
       }
 
       return { data: list, error: null };
@@ -385,35 +439,7 @@ class ProjectsService {
    * @param {string} searchTerm - Search term
    * @returns {Promise<{data: Array, error: Error|null}>}
    */
-  static async searchProjects(searchTerm) {
-    try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError || !user) {
-        throw new Error('User not authenticated');
-      }
-
-      if (!searchTerm || searchTerm.trim().length === 0) {
-        return this.getProjects(); // Return all projects if no search term
-      }
-
-      const searchQuery = `%${searchTerm.trim()}%`;
-
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('user_id', user.id)
-        .or(`title.ilike.${searchQuery},property_address.ilike.${searchQuery}`)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      return { data: data || [], error: null };
-    } catch (error) {
-      console.error('Error searching projects:', error);
-      return { data: [], error };
-    }
-  }
+  // [removed duplicate searchProjects method]
 
   /**
    * Get project statistics
