@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import AuthModal from '../auth/AuthModal';
@@ -7,6 +7,7 @@ import LoadingSpinner from './LoadingSpinner';
 
 const Header = () => {
   const { user, signOut, loading } = useAuth();
+  const navigate = useNavigate();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -48,6 +49,7 @@ const Header = () => {
     await signOut();
     setIsSigningOut(false);
     setShowUserMenu(false);
+    navigate('/');
   };
 
   const getUserDisplayName = () => {

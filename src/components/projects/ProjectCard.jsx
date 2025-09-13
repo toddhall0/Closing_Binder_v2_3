@@ -15,14 +15,14 @@ export const ProjectCard = ({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [clientName, setClientName] = useState(project?.client?.name || project?.client_name || project?.clientName || project?.client?.company || null);
-  const [clientSlug, setClientSlug] = useState(project?.client?.slug || null);
+  const [clientSlug, setClientSlug] = useState(project?.client?.slug || project?.client_slug || null);
 
   useEffect(() => {
     let active = true;
     const load = async () => {
       try {
         // If explicitly assigned, resolve client display info from clients table
-        if (!clientName && project?.client_id) {
+        if (project?.client_id && (!clientName || !clientSlug)) {
           const { default: ClientsService } = await import('../../services/clientsService');
           const { data } = await ClientsService.getById(project.client_id);
           if (active && data) {
@@ -38,7 +38,7 @@ export const ProjectCard = ({
     load();
     return () => { active = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project?.client_id]);
+  }, [project?.client_id, clientName, clientSlug]);
 
   // Clear cached client display when project becomes unassigned
   useEffect(() => {

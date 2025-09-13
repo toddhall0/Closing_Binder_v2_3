@@ -113,14 +113,24 @@ const ContactInfoPDF = ({ project }) => {
             {representativeValue && (
               <Text style={styles.row}><Text style={styles.label}>Representative: </Text>{representativeValue}</Text>
             )}
-            {info.address && (
-              <Text style={styles.row}><Text style={styles.label}>Address: </Text>{info.address}</Text>
+            {(info.address_line1 || info.city || info.state || info.zip) && (
+              <Text style={styles.row}>
+                <Text style={styles.label}>Address: </Text>
+                {[
+                  info.address_line1,
+                  [info.city, info.state].filter(Boolean).join(', '),
+                  info.zip
+                ].filter(Boolean).join(' ')}
+              </Text>
             )}
             {info.email && (
               <Text style={styles.row}><Text style={styles.label}>Email: </Text>{info.email}</Text>
             )}
             {info.phone && (
               <Text style={styles.row}><Text style={styles.label}>Phone: </Text>{info.phone}</Text>
+            )}
+            {key === 'lender' && info.loan_amount && (
+              <Text style={styles.row}><Text style={styles.label}>Loan Amount: </Text>{info.loan_amount}</Text>
             )}
             {info.web && (
               <Text style={styles.row}><Text style={styles.label}>Web: </Text>{info.web}</Text>

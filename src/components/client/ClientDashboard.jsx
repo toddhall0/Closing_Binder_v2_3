@@ -25,6 +25,9 @@ const ClientDashboard = () => {
   const [client, setClient] = React.useState(null);
   const { binders, loading, error, filters, updateFilters, clearFilters, refresh } = useClientBinders(slug);
   const [isFirmAdmin, setIsFirmAdmin] = React.useState(false);
+  const [viewMode, setViewMode] = React.useState('cards'); // 'cards' | 'list'
+  const [sortBy, setSortBy] = React.useState('published_at');
+  const [sortDir, setSortDir] = React.useState('desc');
 
   React.useEffect(() => {
     const checkRole = async () => {
@@ -58,6 +61,68 @@ const ClientDashboard = () => {
   }, [slug]);
 
   const selectedParties = useMemo(() => new Set(filters.parties || []), [filters.parties]);
+
+  const getBinderState = (b) => {
+    const addr = b?.property_address || b?.projects?.property_address || '';
+    const m = String(addr).match(/\b([A-Z]{2})\b/);
+    return m ? m[1] : '';
+  };
+
+  const getBinderClosingDate = (b) => {
+    const c = b?.cover_page_data || {};
+    return c.closingDate ?? c.closing_date ?? b?.closing_date ?? b?.projects?.closing_date ?? null;
+  };
+
+  const getBinderPrice = (b) => {
+    const c = b?.cover_page_data || {};
+    const v = c.purchasePrice ?? c.purchase_price ?? b?.purchase_price ?? b?.projects?.purchase_price ?? null;
+    const n = typeof v === 'number' ? v : parseFloat(String(v || '').replace(/[^0-9.]/g, ''));
+    return isFinite(n) ? n : null;
+  };
+
+  const sortedBinders = useMemo(() => {
+    const list = [...binders];
+    const dir = sortDir === 'asc' ? 1 : -1;
+    list.sort((a, b) => {
+      let av, bv;
+      switch (sortBy) {
+        case 'title':
+          av = (a.title || a.projects?.title || '').toLowerCase();
+          bv = (b.title || b.projects?.title || '').toLowerCase();
+          return av.localeCompare(bv) * dir;
+        case 'address':
+          av = (a.property_address || a.projects?.property_address || '').toLowerCase();
+          bv = (b.property_address || b.projects?.property_address || '').toLowerCase();
+          return av.localeCompare(bv) * dir;
+        case 'state':
+          av = getBinderState(a);
+          bv = getBinderState(b);
+          return av.localeCompare(bv) * dir;
+        case 'closing_date':
+          av = getBinderClosingDate(a) ? new Date(getBinderClosingDate(a)).getTime() : 0;
+          bv = getBinderClosingDate(b) ? new Date(getBinderClosingDate(b)).getTime() : 0;
+          return (av - bv) * dir;
+        case 'price':
+          av = getBinderPrice(a) ?? -Infinity;
+          bv = getBinderPrice(b) ?? -Infinity;
+          return (av - bv) * dir;
+        default:
+          av = new Date(a.published_at || a.created_at || 0).getTime();
+          bv = new Date(b.published_at || b.created_at || 0).getTime();
+          return (av - bv) * dir;
+      }
+    });
+    return list;
+  }, [binders, sortBy, sortDir]);
+
+  const toggleSort = (key) => {
+    if (sortBy === key) {
+      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(key);
+      setSortDir('asc');
+    }
+  };
 
   const toggleParty = (key) => {
     const next = new Set(selectedParties);
@@ -104,7 +169,16 @@ const ClientDashboard = () => {
                   </>
                 )}
               </div>
-              <Button variant="secondary" size="sm" onClick={refresh} disabled={loading}>Refresh</Button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setViewMode((m) => (m === 'cards' ? 'list' : 'cards'))}
+                  className="px-3 py-1.5 text-sm rounded border border-gray-300 bg-white hover:bg-gray-50"
+                  disabled={loading}
+                >
+                  {viewMode === 'cards' ? 'List View' : 'Card View'}
+                </button>
+                <Button variant="secondary" size="sm" onClick={refresh} disabled={loading}>Refresh</Button>
+              </div>
             </div>
           </div>
         </div>
@@ -188,12 +262,11 @@ const ClientDashboard = () => {
             <h3 className="text-lg font-medium text-gray-900">No binders found</h3>
             <p className="text-sm text-gray-600 mt-1">Try adjusting your filters.</p>
           </div>
-        ) : (
+        ) : viewMode === 'cards' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {binders.map((b) => (
+            {sortedBinders.map((b) => (
               <div key={b.id} className="relative">
                 <ClientBinderCard binder={b} onOpen={() => openBinder(b)} />
-                {/* Firm-only delete control */}
                 {isFirmAdmin && (
                   <button
                     onClick={() => handleDeleteBinder(b)}
@@ -205,6 +278,45 @@ const ClientDashboard = () => {
                 )}
               </div>
             ))}
+          </div>
+        ) : (
+          <div className="overflow-x-auto border border-gray-200 rounded-md">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer" onClick={() => toggleSort('title')}>Title</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer" onClick={() => toggleSort('address')}>Address</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer" onClick={() => toggleSort('state')}>State</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer" onClick={() => toggleSort('price')}>Purchase Price</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer" onClick={() => toggleSort('closing_date')}>Closing Date</th>
+                  <th className="px-4 py-2" />
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-100">
+                {sortedBinders.map((b) => {
+                  const title = b?.title || b?.projects?.title || 'Closing Binder';
+                  const address = b?.property_address || b?.projects?.property_address || '';
+                  const state = getBinderState(b);
+                  const price = getBinderPrice(b);
+                  const closing = getBinderClosingDate(b);
+                  return (
+                    <tr key={b.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-2 text-sm text-gray-900">{title}</td>
+                      <td className="px-4 py-2 text-sm text-gray-700">{address || '—'}</td>
+                      <td className="px-4 py-2 text-sm text-gray-700">{state || '—'}</td>
+                      <td className="px-4 py-2 text-sm text-gray-700">{price != null ? price.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : '—'}</td>
+                      <td className="px-4 py-2 text-sm text-gray-700">{closing ? new Date(closing).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
+                      <td className="px-4 py-2 text-right">
+                        <button onClick={() => openBinder(b)} className="text-sm text-black hover:underline">Open</button>
+                        {isFirmAdmin && (
+                          <button onClick={() => handleDeleteBinder(b)} className="ml-3 text-sm text-red-600 hover:underline">Remove</button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

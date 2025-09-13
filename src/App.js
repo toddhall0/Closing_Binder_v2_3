@@ -6,6 +6,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Header from './components/common/Header';
 import PublicLanding from './components/common/PublicLanding';
+import HomeRoute from './components/common/HomeRoute';
 import Login from './components/auth/Login';
 import Signup from './components/auth/Signup';
 import Dashboard from './components/dashboard/Dashboard';
@@ -25,8 +26,9 @@ function App() {
           <Header />
           <main>
             <Routes>
-              {/* Public Routes */}
-              <Route path="/" element={<PublicLanding />} />
+              {/* Public Routes (Home redirects logged-in users by role) */}
+              <Route path="/" element={<HomeRoute />} />
+              <Route path="/public" element={<PublicLanding />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/document-viewer" element={<DocumentViewer />} />

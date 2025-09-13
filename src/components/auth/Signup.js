@@ -2,13 +2,35 @@ import React from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import SignupForm from './SignupForm';
+import { supabase } from '../../lib/supabase';
 
 const Signup = () => {
   const { user, loading } = useAuth();
+  const [redirectTo, setRedirectTo] = React.useState(null);
+
+  React.useEffect(() => {
+    const determinePostSignupRoute = async () => {
+      if (!loading && user) {
+        try {
+          const email = (user.email || '').toLowerCase();
+          const { data } = await supabase
+            .from('clients')
+            .select('id')
+            .eq('email', email)
+            .limit(1)
+            .maybeSingle();
+          setRedirectTo(data ? '/client' : '/dashboard');
+        } catch {
+          setRedirectTo('/dashboard');
+        }
+      }
+    };
+    determinePostSignupRoute();
+  }, [user, loading]);
 
   // Redirect if already authenticated
-  if (!loading && user) {
-    return <Navigate to="/dashboard" replace />;
+  if (!loading && user && redirectTo) {
+    return <Navigate to={redirectTo} replace />;
   }
 
   const handleSignupSuccess = () => {

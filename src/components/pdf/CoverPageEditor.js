@@ -14,6 +14,7 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
   const [coverData, setCoverData] = useState({
     title: project?.title || '',
     propertyAddress: project?.property_address || '',
+    propertyState: project?.property_state || '',
     propertyDescription: project?.property_description || '',
     closingDate: project?.closing_date || '',
     attorney: project?.attorney || '',
@@ -37,6 +38,23 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
   const [previewMode, setPreviewMode] = useState('cover');
   const [tocStructure, setTocStructure] = useState({ sections: [], documents: [] });
   const [tocLoading, setTocLoading] = useState(false);
+
+  // Formatting helpers
+  const formatPhoneNumber = (value) => {
+    if (!value) return '';
+    const digits = String(value).replace(/\D/g, '').slice(0, 10);
+    const len = digits.length;
+    if (len <= 3) return `(${digits}`;
+    if (len <= 6) return `(${digits.slice(0,3)}) ${digits.slice(3)}`;
+    return `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
+  };
+
+  const formatCurrencyCents = (value) => {
+    if (value == null) return '';
+    const numeric = parseFloat(String(value).replace(/[^0-9.]/g, ''));
+    if (!isFinite(numeric)) return '';
+    return '$' + numeric.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
 
   // Sanitize price input for typing (allow multiple digits and one decimal, up to 2 decimals)
   const sanitizePriceInput = (value) => {
@@ -89,6 +107,7 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
         setCoverData({
           title: projectData.title || '',
           propertyAddress: projectData.property_address || '',
+          propertyState: (projectData.property_state || (projectData.cover_page_data && (typeof projectData.cover_page_data === 'string' ? (()=>{ try { return JSON.parse(projectData.cover_page_data); } catch(_) { return {}; } })() : projectData.cover_page_data)?.propertyState) || ''),
           propertyDescription: projectData.property_description || '',
           closingDate: projectData.closing_date || '',
           attorney: projectData.attorney || '',
@@ -192,9 +211,9 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
       const rawPrice = coverData.purchasePrice.replace(/[$,]/g, '');
       const priceValue = rawPrice ? parseFloat(rawPrice) : null;
       
-      const { data: updatedProject, error } = await supabase
-        .from('projects')
-        .update({
+      // Try save with property_state; if it fails due to missing column, retry without
+      const attemptUpdate = async (includeState) => {
+        const payload = {
           title: coverData.title,
           property_address: coverData.propertyAddress,
           property_description: coverData.propertyDescription,
@@ -206,11 +225,29 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
           escrow_agent: coverData.escrowAgent || null,
           purchase_price: priceValue,
           contact_info: coverData.contact_info,
+          // Keep cover_page_data in sync with state selection so list view sees it
+          cover_page_data: {
+            ...(project?.cover_page_data && typeof project.cover_page_data === 'string' ? (()=>{ try { return JSON.parse(project.cover_page_data); } catch(_) { return {}; } })() : (project?.cover_page_data || {})),
+            propertyState: coverData.propertyState || null
+          },
           updated_at: new Date().toISOString()
-        })
-        .eq('id', project.id)
-        .select('*')
-        .single();
+        };
+        if (includeState) payload.property_state = coverData.propertyState || null;
+        return await supabase
+          .from('projects')
+          .update(payload)
+          .eq('id', project.id)
+          .select('*')
+          .single();
+      };
+
+      let { data: updatedProject, error } = await attemptUpdate(true);
+      if (error) {
+        const msg = String(error.message || '').toLowerCase();
+        if (error.code === '42703' || msg.includes('property_state') || msg.includes('schema cache')) {
+          ({ data: updatedProject, error } = await attemptUpdate(false));
+        }
+      }
 
       if (error) throw error;
 
@@ -269,7 +306,7 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
           
           {/* Real PDF Download Button */}
           <PDFDownloadLink
-            document={<CoverPagePDF coverData={coverData} logos={logos} propertyPhoto={propertyPhoto} />}
+            document={<CoverPagePDF project={{ cover_page_data: coverData }} logos={logos} propertyPhoto={propertyPhoto} customData={{}} />}
             fileName={getPDFFileName()}
             className="inline-flex items-center px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
           >
@@ -342,12 +379,12 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
               )}
               {/* Transaction Details */}
               <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
-                    {coverData.buyer && (<div><span className="font-medium">Buyer:</span> {coverData.buyer}</div>)}
-                    {coverData.seller && (<div><span className="font-medium">Seller:</span> {coverData.seller}</div>)}
+                    {(coverData.contact_info?.buyer?.company) && (<div><span className="font-medium">Buyer:</span> {coverData.contact_info.buyer.company}</div>)}
+                    {(coverData.contact_info?.seller?.company) && (<div><span className="font-medium">Seller:</span> {coverData.contact_info.seller.company}</div>)}
                     {coverData.closingDate && (<div><span className="font-medium">Closing:</span> {new Date(coverData.closingDate).toLocaleDateString()}</div>)}
-                    {coverData.escrowAgent && (<div><span className="font-medium">Escrow:</span> {coverData.escrowAgent}</div>)}
+                    {(coverData.contact_info?.escrow_agent?.company) && (<div><span className="font-medium">Escrow:</span> {coverData.contact_info.escrow_agent.company}</div>)}
                     {coverData.attorney && (<div><span className="font-medium">Attorney:</span> {coverData.attorney}</div>)}
-                    {coverData.lender && (<div><span className="font-medium">Lender:</span> {coverData.lender}</div>)}
+                    {(coverData.contact_info?.lender?.company) && (<div><span className="font-medium">Lender:</span> {coverData.contact_info.lender.company}</div>)}
               </div>
               {/* Spacer to push logos/footer to bottom */}
               <div className="flex-1" />
@@ -552,6 +589,21 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
             <input type="text" value={coverData.propertyAddress} onChange={(e) => setCoverData(prev => ({ ...prev, propertyAddress: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:border-black" placeholder="Enter property address" />
           </div>
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Property State</label>
+            <select
+              value={coverData.propertyState}
+              onChange={(e) => setCoverData(prev => ({ ...prev, propertyState: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:border-black"
+            >
+              <option value="">Select state…</option>
+              {[
+                'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'
+              ].map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Property Description</label>
             <textarea value={coverData.propertyDescription} onChange={(e) => setCoverData(prev => ({ ...prev, propertyDescription: e.target.value }))} rows={4} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:border-black" placeholder="Enter property description (use Enter key for line breaks)" />
             <p className="text-xs text-gray-500 mt-1">Tip: Press Enter to create line breaks that will appear on the cover page</p>
@@ -614,8 +666,20 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
                 <input className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:border-black" value={info.representative || ''} onChange={(e) => update('representative', e.target.value)} placeholder="Representative name" />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-                <input className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:border-black" value={info.address || ''} onChange={(e) => update('address', e.target.value)} placeholder="Street, City, State ZIP" />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Street Address</label>
+                <input className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:border-black" value={info.address_line1 || ''} onChange={(e) => update('address_line1', e.target.value)} placeholder="123 Main St" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                <input className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:border-black" value={info.city || ''} onChange={(e) => update('city', e.target.value)} placeholder="City" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                <input className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:border-black" value={info.state || ''} onChange={(e) => update('state', e.target.value.toUpperCase())} placeholder="ST" maxLength={2} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Zip</label>
+                <input className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:border-black" value={info.zip || ''} onChange={(e) => update('zip', e.target.value)} placeholder="Zip" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
@@ -623,12 +687,18 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                <input className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:border-black" value={info.phone || ''} onChange={(e) => update('phone', e.target.value)} placeholder="(555) 555-5555" />
+                <input className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:border-black" value={info.phone || ''} onChange={(e) => update('phone', formatPhoneNumber(e.target.value))} placeholder="(555) 555-5555" />
               </div>
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Web</label>
                 <input className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:border-black" value={info.web || ''} onChange={(e) => update('web', e.target.value)} placeholder="https://example.com" />
               </div>
+              {roleKey === 'lender' && (
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Loan Amount</label>
+                  <input className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:border-black" value={info.loan_amount || ''} onChange={(e) => update('loan_amount', formatCurrencyCents(e.target.value))} placeholder="$0.00" />
+                </div>
+              )}
             </div>
           );
         };
@@ -673,7 +743,6 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
                   </div>
                   <div>
                     <h4 className="text-md font-semibold text-gray-900 mb-2">Lender</h4>
-                    <input type="text" value={coverData.lender} onChange={(e) => setCoverData(prev => ({ ...prev, lender: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:border-black mb-2" placeholder="Lender name" />
                     {renderContactFields('lender')}
                   </div>
                 </div>
@@ -715,7 +784,6 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
                   {/* Escrow Agent paired across from Lender */}
                   <div>
                     <h4 className="text-md font-semibold text-gray-900 mb-2">Escrow Agent</h4>
-                    <input type="text" value={coverData.escrowAgent} onChange={(e) => setCoverData(prev => ({ ...prev, escrowAgent: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:border-black mb-2" placeholder="Escrow agent name" />
                     {renderContactFields('escrow_agent')}
                     <div className="mt-3">
                       <label className="block text-sm font-medium text-gray-700 mb-1">File Number</label>

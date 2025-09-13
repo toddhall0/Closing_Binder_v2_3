@@ -9,7 +9,8 @@ export const EditProjectModal = ({ isOpen, onClose, project, onUpdateProject, lo
   const [formData, setFormData] = useState({
     title: '',
     property_address: '',
-    property_description: ''
+    property_description: '',
+    property_state: ''
   });
   const [errors, setErrors] = useState({});
   const [clientTerm, setClientTerm] = useState('');
@@ -21,7 +22,8 @@ export const EditProjectModal = ({ isOpen, onClose, project, onUpdateProject, lo
       setFormData({
         title: project.title || '',
         property_address: project.property_address || '',
-        property_description: project.property_description || ''
+        property_description: project.property_description || '',
+        property_state: project.property_state || ''
       });
       setErrors({});
       setClientId(project.client_id || '');
@@ -75,6 +77,20 @@ export const EditProjectModal = ({ isOpen, onClose, project, onUpdateProject, lo
     if (!project) return;
     if (!validateForm()) return;
     const updates = { ...formData };
+    // Mirror state into cover_page_data.propertyState so other views read it consistently
+    try {
+      let existingCover = project?.cover_page_data || {};
+      if (typeof existingCover === 'string') {
+        try { existingCover = JSON.parse(existingCover); } catch (_) { existingCover = {}; }
+      }
+      updates.cover_page_data = {
+        ...existingCover,
+        propertyState: formData.property_state || null
+      };
+    } catch (_) {
+      // Fall back to minimal object
+      updates.cover_page_data = { propertyState: formData.property_state || null };
+    }
     if (clientId) {
       const selected = clients.find(c => c.id === clientId);
       updates.client_id = clientId;
@@ -119,6 +135,21 @@ export const EditProjectModal = ({ isOpen, onClose, project, onUpdateProject, lo
           error={errors.property_address}
           disabled={loading}
         />
+        <div className="space-y-1">
+          <label className="block text-sm font-medium text-gray-900">Property State</label>
+          <select
+            name="property_state"
+            value={formData.property_state}
+            onChange={handleChange}
+            disabled={loading}
+            className="block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
+          >
+            <option value="">Select state…</option>
+            {['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'].map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
         <div className="space-y-1">
           <label className="block text-sm font-medium text-gray-900">Property Description</label>
           <textarea

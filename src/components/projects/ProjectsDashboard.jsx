@@ -9,18 +9,18 @@ import { Button } from './Button';
 // Removed unused Input import
 import { LoadingSpinner } from './LoadingSpinner';
 import { ClientsService } from '../../services/clientsService';
+import CreateClientModal from './CreateClientModal';
 
 const ClientSelect = ({ value, onChange }) => {
   const [options, setOptions] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
-  const [term, setTerm] = React.useState('');
 
   React.useEffect(() => {
     let active = true;
     const load = async () => {
       setLoading(true);
       try {
-        const { data } = await ClientsService.getClients(term);
+        const { data } = await ClientsService.getClients('');
         if (active) setOptions(data || []);
       } finally {
         if (active) setLoading(false);
@@ -28,17 +28,10 @@ const ClientSelect = ({ value, onChange }) => {
     };
     load();
     return () => { active = false; };
-  }, [term]);
+  }, []);
 
   return (
     <div>
-      <input
-        type="text"
-        value={term}
-        onChange={(e)=>setTerm(e.target.value)}
-        placeholder="Search clients..."
-        className="block w-full px-3 py-2 border border-gray-300 mb-2"
-      />
       <select
         className="block w-full px-3 py-2 border border-gray-300"
         value={value || ''}
@@ -71,6 +64,7 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
   } = useProjects();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isCreateClientOpen, setIsCreateClientOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -79,6 +73,119 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
   const [localFrom, setLocalFrom] = useState('');
   const [localTo, setLocalTo] = useState('');
   const [localClientId, setLocalClientId] = useState('');
+  const [viewMode, setViewMode] = useState('list'); // 'cards' | 'list'
+  const [sortBy, setSortBy] = useState('title');
+  const [sortDir, setSortDir] = useState('asc');
+  const [localStateFilter, setLocalStateFilter] = useState('');
+
+  const getProjectState = (project) => {
+    // Single source of truth precedence:
+    // 1) cover_page_data.propertyState
+    // 2) projects.property_state
+    // 3) parsed from address
+    let cpd = project?.cover_page_data;
+    if (typeof cpd === 'string') {
+      try { cpd = JSON.parse(cpd); } catch(_) { cpd = null; }
+    }
+    if (cpd && typeof cpd === 'object') {
+      const ps1 = (cpd.propertyState || cpd.property_state || '').toString().trim().toUpperCase();
+      if (ps1 && /^[A-Z]{2}$/.test(ps1)) return ps1;
+    }
+    const ps2 = (project?.property_state || '').toString().trim().toUpperCase();
+    if (ps2 && /^[A-Z]{2}$/.test(ps2)) return ps2;
+    const addr = (project?.property_address || '').toString();
+    const m = addr.match(/\b([A-Z]{2})\b/);
+    return m ? m[1] : '';
+  };
+
+  // Filter projects based on selected state (client-side)
+  const filteredProjects = React.useMemo(() => {
+    let list = projects;
+    if (localStateFilter) {
+      list = list.filter((p) => getProjectState(p) === localStateFilter);
+    }
+    return list;
+  }, [projects, localStateFilter]);
+
+  const getClientName = (project) => project?.client_name || '';
+  const getPrice = (project) => {
+    const raw = project?.purchase_price;
+    const n = typeof raw === 'number' ? raw : parseFloat(String(raw ?? '').replace(/[^0-9.]/g, ''));
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const sortedProjects = React.useMemo(() => {
+    const list = [...filteredProjects];
+    const dir = sortDir === 'asc' ? 1 : -1;
+    list.sort((a, b) => {
+      let av, bv;
+      switch (sortBy) {
+        case 'title':
+          av = (a.title || '').toLowerCase();
+          bv = (b.title || '').toLowerCase();
+          return av.localeCompare(bv) * dir;
+        case 'address':
+          av = (a.property_address || '').toLowerCase();
+          bv = (b.property_address || '').toLowerCase();
+          return av.localeCompare(bv) * dir;
+        case 'state':
+          av = getProjectState(a);
+          bv = getProjectState(b);
+          return av.localeCompare(bv) * dir;
+        case 'client_name':
+          av = getClientName(a).toLowerCase();
+          bv = getClientName(b).toLowerCase();
+          return av.localeCompare(bv) * dir;
+        case 'price':
+          av = getPrice(a) ?? -Infinity;
+          bv = getPrice(b) ?? -Infinity;
+          return (av - bv) * dir;
+        case 'closing_date':
+          av = a.closing_date ? new Date(a.closing_date).getTime() : 0;
+          bv = b.closing_date ? new Date(b.closing_date).getTime() : 0;
+          return (av - bv) * dir;
+        default:
+          return 0;
+      }
+    });
+    return list;
+  }, [filteredProjects, sortBy, sortDir]);
+
+  const groupedForList = React.useMemo(() => {
+    if (sortBy !== 'state' && sortBy !== 'client_name') return null;
+    const groups = [];
+    const keyToIndex = new Map();
+    for (const p of sortedProjects) {
+      const k = sortBy === 'state' ? (getProjectState(p) || '—') : (getClientName(p) || '—');
+      if (!keyToIndex.has(k)) {
+        keyToIndex.set(k, groups.length);
+        groups.push({ key: k, items: [] });
+      }
+      groups[keyToIndex.get(k)].items.push(p);
+    }
+    return groups;
+  }, [sortedProjects, sortBy]);
+
+  const toggleSort = (key) => {
+    if (sortBy === key) {
+      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(key);
+      setSortDir('asc');
+    }
+  };
+
+  const ColGroup = () => (
+    <colgroup>
+      <col style={{ width: 260 }} /> {/* Title */}
+      <col style={{ width: 360 }} /> {/* Address */}
+      <col style={{ width: 90 }} />  {/* State */}
+      <col style={{ width: 220 }} /> {/* Client */}
+      <col style={{ width: 160 }} /> {/* Purchase Price */}
+      <col style={{ width: 160 }} /> {/* Closing Date */}
+      <col style={{ width: 140 }} /> {/* Actions */}
+    </colgroup>
+  );
 
   useEffect(() => { setLocalClientId(clientId || ''); }, [clientId]);
 
@@ -145,9 +252,6 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
     refreshProjects();
   };
 
-  // Filter projects based on search (client-side filtering for immediate feedback)
-  const filteredProjects = projects;
-
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
@@ -163,15 +267,27 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
                   Manage your PDF closing binder projects
                 </p>
               </div>
-              <Button
-                onClick={() => setIsCreateModalOpen(true)}
-                disabled={loading}
-              >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                New Project
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => setIsCreateModalOpen(true)}
+                  variant="secondary"
+                  disabled={loading}
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  New Project
+                </Button>
+                <Button
+                  onClick={() => setIsCreateClientOpen(true)}
+                  disabled={loading}
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  New Client
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -180,7 +296,7 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Search and Filter Bar */}
-        <div className="mb-8 grid grid-cols-1 sm:grid-cols-5 gap-4 items-end">
+        <div className="mb-8 grid grid-cols-1 sm:grid-cols-6 gap-4 items-end">
           <div className="sm:col-span-2">
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -216,12 +332,32 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
             />
           </div>
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+            <select
+              className="block w-full px-3 py-2 border border-gray-300"
+              value={localStateFilter}
+              onChange={(e)=> setLocalStateFilter(e.target.value)}
+            >
+              <option value="">All states</option>
+              {['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'].map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
             <ClientSelect value={localClientId} onChange={(v)=>{ setLocalClientId(v); handleSearch(localSearchTerm, localFrom, localTo, v); }} />
           </div>
           <div className="flex space-x-3">
-            <Button variant="secondary" onClick={()=>{ setLocalSearchTerm(''); setLocalFrom(''); setLocalTo(''); setLocalClientId(''); handleSearch('', '', '', ''); }} disabled={loading} size="sm">Clear</Button>
+            <Button variant="secondary" onClick={()=>{ setLocalSearchTerm(''); setLocalFrom(''); setLocalTo(''); setLocalClientId(''); setLocalStateFilter(''); handleSearch('', '', '', ''); }} disabled={loading} size="sm">Clear</Button>
             <Button variant="secondary" onClick={handleRefresh} disabled={loading} size="sm">Refresh</Button>
+            <button
+              onClick={() => setViewMode((m) => (m === 'cards' ? 'list' : 'cards'))}
+              className="px-3 py-1.5 text-sm rounded border border-gray-300 bg-white hover:bg-gray-50 whitespace-nowrap min-w-[110px]"
+              disabled={loading}
+            >
+              {viewMode === 'cards' ? 'List View' : 'Card View'}
+            </button>
           </div>
         </div>
 
@@ -277,7 +413,7 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
               </div>
             )}
           </div>
-        ) : (
+        ) : viewMode === 'cards' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredProjects.map((project) => (
               <ProjectCard
@@ -288,6 +424,99 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
                 onDelete={openDeleteDialog}
                 loading={actionLoading && selectedProject?.id === project.id}
               />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {!groupedForList && (
+              <div className="overflow-x-auto border border-gray-200 rounded-md">
+                <table className="min-w-full table-fixed divide-y divide-gray-200">
+                  <ColGroup />
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th onClick={() => toggleSort('title')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Title</th>
+                      <th onClick={() => toggleSort('address')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Address</th>
+                      <th onClick={() => toggleSort('state')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">State</th>
+                      <th onClick={() => toggleSort('client_name')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Client</th>
+                      <th onClick={() => toggleSort('price')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Purchase Price</th>
+                      <th onClick={() => toggleSort('closing_date')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Closing Date</th>
+                      <th className="px-4 py-2" />
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-100">
+                    {sortedProjects.map((project) => (
+                      <tr key={project.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 text-sm text-gray-900">{project.title || 'Untitled Project'}</td>
+                        <td className="px-4 py-2 text-sm text-gray-700">{project.property_address || '—'}</td>
+                        <td className="px-4 py-2 text-sm text-gray-700">{getProjectState(project) || '—'}</td>
+                        <td className="px-4 py-2 text-sm text-gray-700">{getClientName(project) || '—'}</td>
+                        <td className="px-4 py-2 text-sm text-gray-700">{getPrice(project) != null ? getPrice(project).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : '—'}</td>
+                        <td className="px-4 py-2 text-sm text-gray-700">{project.closing_date ? new Date(project.closing_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
+                        <td className="px-4 py-2 text-right whitespace-nowrap">
+                          <Button size="xs" variant="info" onClick={() => onProjectSelect(project)}>Open</Button>
+                          <Button size="xs" variant="secondary" className="ml-2" onClick={() => handleEditProject(project)}>Edit</Button>
+                          <Button
+                            size="xs"
+                            variant="danger"
+                            className="ml-2"
+                            onClick={() => openDeleteDialog(project)}
+                            disabled={actionLoading && selectedProject?.id === project.id}
+                          >
+                            Delete
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {groupedForList && groupedForList.map((group) => (
+              <div key={group.key} className="overflow-x-auto border border-gray-200 rounded-md">
+                <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-800">
+                  {sortBy === 'state' ? `State: ${group.key}` : `Client: ${group.key}`}
+                </div>
+                <table className="min-w-full table-fixed divide-y divide-gray-200">
+                  <ColGroup />
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th onClick={() => toggleSort('title')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Title</th>
+                      <th onClick={() => toggleSort('address')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Address</th>
+                      <th onClick={() => toggleSort('state')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">State</th>
+                      <th onClick={() => toggleSort('client_name')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Client</th>
+                      <th onClick={() => toggleSort('price')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Purchase Price</th>
+                      <th onClick={() => toggleSort('closing_date')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Closing Date</th>
+                      <th className="px-4 py-2" />
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-100">
+                    {group.items.map((project) => (
+                      <tr key={project.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 text-sm text-gray-900">{project.title || 'Untitled Project'}</td>
+                        <td className="px-4 py-2 text-sm text-gray-700">{project.property_address || '—'}</td>
+                        <td className="px-4 py-2 text-sm text-gray-700">{getProjectState(project) || '—'}</td>
+                        <td className="px-4 py-2 text-sm text-gray-700">{getClientName(project) || '—'}</td>
+                        <td className="px-4 py-2 text-sm text-gray-700">{getPrice(project) != null ? getPrice(project).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : '—'}</td>
+                        <td className="px-4 py-2 text-sm text-gray-700">{project.closing_date ? new Date(project.closing_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
+                        <td className="px-4 py-2 text-right whitespace-nowrap">
+                          <Button size="xs" variant="info" onClick={() => onProjectSelect(project)}>Open</Button>
+                          <Button size="xs" variant="secondary" className="ml-2" onClick={() => handleEditProject(project)}>Edit</Button>
+                          <Button
+                            size="xs"
+                            variant="danger"
+                            className="ml-2"
+                            onClick={() => openDeleteDialog(project)}
+                            disabled={actionLoading && selectedProject?.id === project.id}
+                          >
+                            Delete
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             ))}
           </div>
         )}
@@ -306,6 +535,19 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
         onClose={() => setIsCreateModalOpen(false)}
         onCreateProject={handleCreateProject}
         loading={actionLoading}
+      />
+
+      {/* Create Client Modal */}
+      <CreateClientModal
+        isOpen={isCreateClientOpen}
+        onClose={() => setIsCreateClientOpen(false)}
+        onCreated={(client) => {
+          try {
+            const id = client?.id || '';
+            setLocalClientId(id);
+            handleSearch(localSearchTerm, localFrom, localTo, id);
+          } catch {}
+        }}
       />
 
       {/* Edit Project Modal */}

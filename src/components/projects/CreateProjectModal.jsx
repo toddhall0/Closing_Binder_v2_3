@@ -9,7 +9,8 @@ export const CreateProjectModal = ({ isOpen, onClose, onCreateProject, loading =
   const [formData, setFormData] = useState({
     title: '',
     property_address: '',
-    property_description: ''
+    property_description: '',
+    property_state: ''
   });
   
   const [errors, setErrors] = useState({});
@@ -71,7 +72,8 @@ export const CreateProjectModal = ({ isOpen, onClose, onCreateProject, loading =
     setFormData({
       title: '',
       property_address: '',
-      property_description: ''
+      property_description: '',
+      property_state: ''
     });
     setErrors({});
     onClose();
@@ -107,6 +109,32 @@ export const CreateProjectModal = ({ isOpen, onClose, onCreateProject, loading =
           error={errors.property_address}
           disabled={loading}
         />
+
+        {/* Property State */}
+        <div className="space-y-1">
+          <label className="block text-sm font-medium text-gray-900">
+            Property State
+          </label>
+          <select
+            name="property_state"
+            value={formData.property_state}
+            onChange={handleChange}
+            disabled={loading}
+            className={`block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors ${
+              errors.property_state ? 'border-red-500 focus:ring-red-500' : ''
+            }`}
+          >
+            <option value="">Select state…</option>
+            {[
+              'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'
+            ].map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+          {errors.property_state && (
+            <p className="text-sm text-red-600">{errors.property_state}</p>
+          )}
+        </div>
 
         {/* Property Description */}
         <div className="space-y-1">

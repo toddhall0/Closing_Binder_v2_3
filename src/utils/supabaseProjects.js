@@ -228,14 +228,33 @@ class ProjectsService {
         title: projectData.title.trim(),
         property_address: projectData.property_address.trim(),
         property_description: projectData.property_description?.trim() || '',
+        // Try to persist property_state if the column exists; ignore failure otherwise
+        property_state: projectData.property_state || null,
+        // Seed cover_page_data with propertyState so other views can read it immediately
+        cover_page_data: { propertyState: projectData.property_state || null },
         cover_photo_url: projectData.cover_photo_url || null
       };
 
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('projects')
         .insert(projectToInsert)
         .select()
         .single();
+
+      // If insert failed due to missing column, retry without property_state
+      if (error) {
+        const msg = String(error.message || '').toLowerCase();
+        if (error.code === '42703' || msg.includes('property_state') || msg.includes('schema cache')) {
+          const fallback = { ...projectToInsert };
+          delete fallback.property_state;
+          // Still keep cover_page_data seed
+          ({ data, error } = await supabase
+            .from('projects')
+            .insert(fallback)
+            .select()
+            .single());
+        }
+      }
 
       if (error) throw error;
 
@@ -278,13 +297,27 @@ class ProjectsService {
         throw new Error('No valid fields to update');
       }
 
-      const { data, error } = await supabase
-        .from('projects')
-        .update(filteredUpdates)
-        .eq('id', projectId)
-        .eq('user_id', user.id)
-        .select()
-        .single();
+      const attempt = async (payload) => {
+        return supabase
+          .from('projects')
+          .update(payload)
+          .eq('id', projectId)
+          .eq('user_id', user.id)
+          .select()
+          .single();
+      };
+
+      let { data, error } = await attempt(filteredUpdates);
+
+      // If the update failed due to missing property_state column, retry without it
+      if (error) {
+        const msg = String(error.message || '').toLowerCase();
+        if (error.code === '42703' || msg.includes('property_state') || msg.includes('schema cache')) {
+          const fallback = { ...filteredUpdates };
+          delete fallback.property_state;
+          ({ data, error } = await attempt(fallback));
+        }
+      }
 
       if (error) {
         if (error.code === 'PGRST116') {
