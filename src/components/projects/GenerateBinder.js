@@ -3,7 +3,7 @@
 // FIXED VERSION - Removed "Complete Binder" tab only
 // ===============================
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FileText, Globe } from 'lucide-react';
 
 // Import components
@@ -12,6 +12,16 @@ import HybridBinderGenerator from '../HybridBinderGenerator';
 
 const GenerateBinder = ({ project, onProjectUpdate }) => {
   const [activeSection, setActiveSection] = useState('cover');
+  const [currentProject, setCurrentProject] = useState(project);
+
+  useEffect(() => {
+    setCurrentProject(project);
+  }, [project]);
+
+  const handleLocalProjectUpdate = (updated) => {
+    try { setCurrentProject(updated); } catch {}
+    if (onProjectUpdate) onProjectUpdate(updated);
+  };
 
   // FIXED: Removed the "complete" section from the array
   const sections = [
@@ -24,7 +34,7 @@ const GenerateBinder = ({ project, onProjectUpdate }) => {
     },
     {
       id: 'hybrid',
-      name: 'Generate Binder',
+      name: 'Preview Binder',
       icon: Globe,
       component: HybridBinderGenerator,
       description: 'Generate the interactive web binder and PDF'
@@ -63,32 +73,15 @@ const GenerateBinder = ({ project, onProjectUpdate }) => {
         </nav>
       </div>
 
-      {/* Section Description */}
-      <div className="bg-gray-50 rounded-lg p-4">
-        <div className="flex items-center space-x-3">
-          {(() => {
-            const currentSection = sections.find(s => s.id === activeSection);
-            const Icon = currentSection?.icon;
-            return (
-              <>
-                {Icon && <Icon className="h-5 w-5 text-gray-600" />}
-                <div>
-                  <h3 className="font-medium text-gray-900">{currentSection?.name}</h3>
-                  <p className="text-sm text-gray-600">{currentSection?.description}</p>
-                </div>
-              </>
-            );
-          })()}
-        </div>
-      </div>
+      {/* Section Description removed per spec */}
 
       {/* Section Content */}
       <div className="bg-white rounded-lg border border-gray-200">
         {ActiveComponent && (
           <div className="p-6">
             <ActiveComponent 
-              project={project} 
-              onProjectUpdate={onProjectUpdate}
+              project={currentProject} 
+              onProjectUpdate={handleLocalProjectUpdate}
             />
           </div>
         )}

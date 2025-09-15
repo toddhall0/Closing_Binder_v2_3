@@ -10,7 +10,8 @@ import ProjectsService from '../../utils/supabaseProjects';
 import LoadingSpinner from '../common/LoadingSpinner';
 import DocumentUpload from '../upload/DocumentUpload';
 import DocumentOrganization from '../documents/organization/DocumentOrganization';
-import GenerateBinder from './GenerateBinder';
+import CoverPageEditor from '../pdf/CoverPageEditor';
+import HybridBinderGenerator from '../HybridBinderGenerator';
 import { documentOrganizationService } from '../../utils/documentOrganizationService';
 
 const ProjectDetail = () => {
@@ -19,7 +20,7 @@ const ProjectDetail = () => {
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('documents');
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [showUpload, setShowUpload] = useState(false);
@@ -453,16 +454,7 @@ const ProjectDetail = () => {
       {/* Navigation Tabs */}
       <div className="border-b border-gray-200 mb-8">
         <nav className="flex space-x-8">
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'overview'
-                ? 'border-black text-black'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Overview
-          </button>
+          
           <button
             onClick={() => setActiveTab('documents')}
             className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
@@ -471,7 +463,7 @@ const ProjectDetail = () => {
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            Documents ({projectStats.documents})
+            Upload Documents ({projectStats.documents})
           </button>
           <button
             onClick={() => setActiveTab('organization')}
@@ -481,7 +473,7 @@ const ProjectDetail = () => {
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            Organization
+            Organize Documents
           </button>
           <button
             onClick={() => setActiveTab('binder')}
@@ -491,7 +483,17 @@ const ProjectDetail = () => {
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            Generate Binder
+            Project Details
+          </button>
+          <button
+            onClick={() => setActiveTab('preview')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+              activeTab === 'preview'
+                ? 'border-black text-black'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Preview Binder
           </button>
         </nav>
       </div>
@@ -722,14 +724,14 @@ const ProjectDetail = () => {
                       <div className="flex items-center space-x-2 ml-4">
                         <button
                           onClick={() => handleDocumentView(document)}
-                          className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded border transition-colors"
+                          className="px-3 py-1 text-xs bg-black text-white rounded border border-black hover:bg-gray-800 transition-colors"
                           title="View document"
                         >
                           View
                         </button>
                         <button
                           onClick={() => handleDeleteDocument(document.id, document.file_path)}
-                          className="px-3 py-1 text-xs text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          className="px-3 py-1 text-xs bg-red-600 text-white rounded border border-red-600 hover:bg-red-700 transition-colors"
                           title="Delete document"
                         >
                           Delete
@@ -755,21 +757,23 @@ const ProjectDetail = () => {
 
       {activeTab === 'binder' && (
   <div className="space-y-6">
-    <GenerateBinder 
+    <CoverPageEditor 
       project={project}
       onProjectUpdate={(updatedProject) => {
         setProject(updatedProject);
-        loadProjectStats();
       }}
     />
-    <div>
-      <PublishBinderButton
-        project={project}
-        documents={structure.documents}
-        sections={structure.sections}
-        logos={logos}
-      />
-    </div>
+  </div>
+)}
+
+      {activeTab === 'preview' && (
+  <div className="space-y-6">
+    <HybridBinderGenerator 
+      project={project}
+      onProjectUpdate={(updatedProject) => {
+        try { setProject(updatedProject); } catch {}
+      }}
+    />
   </div>
 )}
 

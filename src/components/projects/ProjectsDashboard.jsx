@@ -1,5 +1,6 @@
 // src/components/projects/ProjectsDashboard.jsx
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useProjects } from '../../hooks/useProjects';
 import { ProjectCard } from './ProjectCard';
 import { CreateProjectModal } from './CreateProjectModal';
@@ -33,7 +34,7 @@ const ClientSelect = ({ value, onChange }) => {
   return (
     <div>
       <select
-        className="block w-full px-3 py-2 border border-gray-300"
+        className="block w-full px-3 py-2 border border-gray-300 h-10"
         value={value || ''}
         onChange={(e)=>onChange(e.target.value)}
       >
@@ -50,6 +51,7 @@ const ClientSelect = ({ value, onChange }) => {
 
 
 export const ProjectsDashboard = ({ onProjectSelect }) => {
+  const navigate = useNavigate();
   const {
     projects,
     loading,
@@ -108,6 +110,30 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
   }, [projects, localStateFilter]);
 
   const getClientName = (project) => project?.client_name || '';
+  const getBuyerCompany = (project) => {
+    try {
+      let cpd = project?.cover_page_data;
+      if (typeof cpd === 'string') {
+        try { cpd = JSON.parse(cpd); } catch (_) { cpd = null; }
+      }
+      const fromContact = cpd?.contact_info?.buyer?.company;
+      return (fromContact || project?.buyer || '').toString();
+    } catch (_) {
+      return (project?.buyer || '').toString();
+    }
+  };
+  const getSellerCompany = (project) => {
+    try {
+      let cpd = project?.cover_page_data;
+      if (typeof cpd === 'string') {
+        try { cpd = JSON.parse(cpd); } catch (_) { cpd = null; }
+      }
+      const fromContact = cpd?.contact_info?.seller?.company;
+      return (fromContact || project?.seller || '').toString();
+    } catch (_) {
+      return (project?.seller || '').toString();
+    }
+  };
   const getPrice = (project) => {
     const raw = project?.purchase_price;
     const n = typeof raw === 'number' ? raw : parseFloat(String(raw ?? '').replace(/[^0-9.]/g, ''));
@@ -136,6 +162,14 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
           av = getClientName(a).toLowerCase();
           bv = getClientName(b).toLowerCase();
           return av.localeCompare(bv) * dir;
+        case 'buyer_company':
+          av = getBuyerCompany(a).toLowerCase();
+          bv = getBuyerCompany(b).toLowerCase();
+          return av.localeCompare(bv) * dir;
+        case 'seller_company':
+          av = getSellerCompany(a).toLowerCase();
+          bv = getSellerCompany(b).toLowerCase();
+          return av.localeCompare(bv) * dir;
         case 'price':
           av = getPrice(a) ?? -Infinity;
           bv = getPrice(b) ?? -Infinity;
@@ -152,11 +186,15 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
   }, [filteredProjects, sortBy, sortDir]);
 
   const groupedForList = React.useMemo(() => {
-    if (sortBy !== 'state' && sortBy !== 'client_name') return null;
+    if (sortBy !== 'state' && sortBy !== 'client_name' && sortBy !== 'buyer_company' && sortBy !== 'seller_company') return null;
     const groups = [];
     const keyToIndex = new Map();
     for (const p of sortedProjects) {
-      const k = sortBy === 'state' ? (getProjectState(p) || '—') : (getClientName(p) || '—');
+      let k = '—';
+      if (sortBy === 'state') k = getProjectState(p) || '—';
+      else if (sortBy === 'client_name') k = getClientName(p) || '—';
+      else if (sortBy === 'buyer_company') k = getBuyerCompany(p) || '—';
+      else if (sortBy === 'seller_company') k = getSellerCompany(p) || '—';
       if (!keyToIndex.has(k)) {
         keyToIndex.set(k, groups.length);
         groups.push({ key: k, items: [] });
@@ -177,12 +215,14 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
 
   const ColGroup = () => (
     <colgroup>
-      <col style={{ width: 260 }} /> {/* Title */}
-      <col style={{ width: 360 }} /> {/* Address */}
+      <col style={{ width: 220 }} /> {/* Title */}
+      <col style={{ width: 300 }} /> {/* Address */}
       <col style={{ width: 90 }} />  {/* State */}
-      <col style={{ width: 220 }} /> {/* Client */}
-      <col style={{ width: 160 }} /> {/* Purchase Price */}
-      <col style={{ width: 160 }} /> {/* Closing Date */}
+      <col style={{ width: 200 }} /> {/* Client */}
+      <col style={{ width: 220 }} /> {/* Buyer Company */}
+      <col style={{ width: 220 }} /> {/* Seller Company */}
+      <col style={{ width: 140 }} /> {/* Purchase Price */}
+      <col style={{ width: 140 }} /> {/* Closing Date */}
       <col style={{ width: 140 }} /> {/* Actions */}
     </colgroup>
   );
@@ -252,6 +292,15 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
     refreshProjects();
   };
 
+  const openProject = (project) => {
+    try {
+      if (onProjectSelect) onProjectSelect(project);
+    } catch {}
+    if (project?.id) {
+      navigate(`/projects/${project.id}`);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
@@ -309,7 +358,7 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
                 placeholder="Search projects..."
                 value={localSearchTerm}
                 onChange={(e) => setLocalSearchTerm(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors h-10"
               />
             </div>
           </div>
@@ -317,7 +366,7 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
             <label className="block text-sm font-medium text-gray-700 mb-1">Closing From</label>
             <input
               type="date"
-              className="block w-full px-3 py-2 border border-gray-300"
+              className="block w-full px-3 py-2 border border-gray-300 h-10"
               value={localFrom}
               onChange={(e)=>{ const v = e.target.value; setLocalFrom(v); handleSearch(localSearchTerm, v, localTo, localClientId); }}
             />
@@ -326,7 +375,7 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
             <label className="block text-sm font-medium text-gray-700 mb-1">Closing To</label>
             <input
               type="date"
-              className="block w-full px-3 py-2 border border-gray-300"
+              className="block w-full px-3 py-2 border border-gray-300 h-10"
               value={localTo}
               onChange={(e)=>{ const v = e.target.value; setLocalTo(v); handleSearch(localSearchTerm, localFrom, v, localClientId); }}
             />
@@ -334,7 +383,7 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
             <select
-              className="block w-full px-3 py-2 border border-gray-300"
+              className="block w-full px-3 py-2 border border-gray-300 h-10"
               value={localStateFilter}
               onChange={(e)=> setLocalStateFilter(e.target.value)}
             >
@@ -438,6 +487,8 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
                       <th onClick={() => toggleSort('address')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Address</th>
                       <th onClick={() => toggleSort('state')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">State</th>
                       <th onClick={() => toggleSort('client_name')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Client</th>
+                      <th onClick={() => toggleSort('buyer_company')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Buyer Company</th>
+                      <th onClick={() => toggleSort('seller_company')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Seller Company</th>
                       <th onClick={() => toggleSort('price')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Purchase Price</th>
                       <th onClick={() => toggleSort('closing_date')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Closing Date</th>
                       <th className="px-4 py-2" />
@@ -445,21 +496,26 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-100">
                     {sortedProjects.map((project) => (
-                      <tr key={project.id} className="hover:bg-gray-50">
+                      <tr
+                        key={project.id}
+                        className="hover:bg-gray-50 cursor-pointer"
+                        onClick={() => openProject(project)}
+                      >
                         <td className="px-4 py-2 text-sm text-gray-900">{project.title || 'Untitled Project'}</td>
                         <td className="px-4 py-2 text-sm text-gray-700">{project.property_address || '—'}</td>
                         <td className="px-4 py-2 text-sm text-gray-700">{getProjectState(project) || '—'}</td>
                         <td className="px-4 py-2 text-sm text-gray-700">{getClientName(project) || '—'}</td>
+                        <td className="px-4 py-2 text-sm text-gray-700">{getBuyerCompany(project) || '—'}</td>
+                        <td className="px-4 py-2 text-sm text-gray-700">{getSellerCompany(project) || '—'}</td>
                         <td className="px-4 py-2 text-sm text-gray-700">{getPrice(project) != null ? getPrice(project).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : '—'}</td>
                         <td className="px-4 py-2 text-sm text-gray-700">{project.closing_date ? new Date(project.closing_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
                         <td className="px-4 py-2 text-right whitespace-nowrap">
-                          <Button size="xs" variant="info" onClick={() => onProjectSelect(project)}>Open</Button>
-                          <Button size="xs" variant="secondary" className="ml-2" onClick={() => handleEditProject(project)}>Edit</Button>
+                          <Button size="xs" variant="primary" onClick={(e) => { e.stopPropagation(); handleEditProject(project); }}>Edit</Button>
                           <Button
                             size="xs"
                             variant="danger"
                             className="ml-2"
-                            onClick={() => openDeleteDialog(project)}
+                            onClick={(e) => { e.stopPropagation(); openDeleteDialog(project); }}
                             disabled={actionLoading && selectedProject?.id === project.id}
                           >
                             Delete
@@ -475,7 +531,7 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
             {groupedForList && groupedForList.map((group) => (
               <div key={group.key} className="overflow-x-auto border border-gray-200 rounded-md">
                 <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-800">
-                  {sortBy === 'state' ? `State: ${group.key}` : `Client: ${group.key}`}
+                  {sortBy === 'state' ? `State: ${group.key}` : sortBy === 'client_name' ? `Client: ${group.key}` : sortBy === 'buyer_company' ? `Buyer Company: ${group.key}` : `Seller Company: ${group.key}`}
                 </div>
                 <table className="min-w-full table-fixed divide-y divide-gray-200">
                   <ColGroup />
@@ -485,6 +541,8 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
                       <th onClick={() => toggleSort('address')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Address</th>
                       <th onClick={() => toggleSort('state')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">State</th>
                       <th onClick={() => toggleSort('client_name')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Client</th>
+                      <th onClick={() => toggleSort('buyer_company')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Buyer Company</th>
+                      <th onClick={() => toggleSort('seller_company')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Seller Company</th>
                       <th onClick={() => toggleSort('price')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Purchase Price</th>
                       <th onClick={() => toggleSort('closing_date')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Closing Date</th>
                       <th className="px-4 py-2" />
@@ -492,21 +550,26 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-100">
                     {group.items.map((project) => (
-                      <tr key={project.id} className="hover:bg-gray-50">
+                      <tr
+                        key={project.id}
+                        className="hover:bg-gray-50 cursor-pointer"
+                        onClick={() => openProject(project)}
+                      >
                         <td className="px-4 py-2 text-sm text-gray-900">{project.title || 'Untitled Project'}</td>
                         <td className="px-4 py-2 text-sm text-gray-700">{project.property_address || '—'}</td>
                         <td className="px-4 py-2 text-sm text-gray-700">{getProjectState(project) || '—'}</td>
                         <td className="px-4 py-2 text-sm text-gray-700">{getClientName(project) || '—'}</td>
+                        <td className="px-4 py-2 text-sm text-gray-700">{getBuyerCompany(project) || '—'}</td>
+                        <td className="px-4 py-2 text-sm text-gray-700">{getSellerCompany(project) || '—'}</td>
                         <td className="px-4 py-2 text-sm text-gray-700">{getPrice(project) != null ? getPrice(project).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : '—'}</td>
                         <td className="px-4 py-2 text-sm text-gray-700">{project.closing_date ? new Date(project.closing_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
                         <td className="px-4 py-2 text-right whitespace-nowrap">
-                          <Button size="xs" variant="info" onClick={() => onProjectSelect(project)}>Open</Button>
-                          <Button size="xs" variant="secondary" className="ml-2" onClick={() => handleEditProject(project)}>Edit</Button>
+                          <Button size="xs" variant="primary" onClick={(e) => { e.stopPropagation(); handleEditProject(project); }}>Edit</Button>
                           <Button
                             size="xs"
                             variant="danger"
                             className="ml-2"
-                            onClick={() => openDeleteDialog(project)}
+                            onClick={(e) => { e.stopPropagation(); openDeleteDialog(project); }}
                             disabled={actionLoading && selectedProject?.id === project.id}
                           >
                             Delete

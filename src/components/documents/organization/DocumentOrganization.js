@@ -88,7 +88,7 @@ const SortableDocumentItem = ({ document, sectionIndex, docIndex, isDragging, se
               alert(e.message || 'Rename failed');
             }
           }}
-          className="px-2 py-1 text-xs text-blue-600 border border-blue-200 rounded hover:bg-blue-50"
+          className="px-2 py-1 text-xs bg-black text-white rounded border border-black hover:bg-gray-800"
         >
           Edit
         </button>
@@ -104,7 +104,7 @@ const SortableDocumentItem = ({ document, sectionIndex, docIndex, isDragging, se
               alert('Delete not implemented in service');
             }
           }}
-          className="px-2 py-1 text-xs text-red-600 border border-red-200 rounded hover:bg-red-50"
+          className="px-2 py-1 text-xs bg-red-600 text-white rounded border border-red-600 hover:bg-red-700"
         >
           Delete
         </button>

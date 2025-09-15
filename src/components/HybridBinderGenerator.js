@@ -4,18 +4,19 @@
 // ===============================
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Globe, FileText, RefreshCw, Download, CheckCircle } from 'lucide-react';
+import { Globe, FileText, Download, CheckCircle } from 'lucide-react';
 import { documentOrganizationService } from '../utils/documentOrganizationService';
 import CoverPageHTML from './web/CoverPageHTML';
 import TableOfContentsHTML from './web/TableOfContentsHTML';
 
 const HybridBinderGenerator = ({ project, onProjectUpdate }) => {
-  const [mode, setMode] = useState('web'); // Start with web mode
+  const [mode] = useState('web'); // Fixed to web mode (buttons removed)
   const [documents, setDocuments] = useState([]);
   const [structure, setStructure] = useState({ sections: [], documents: [] });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [generatedWeb, setGeneratedWeb] = useState(false);
+  const [previewPage, setPreviewPage] = useState('cover'); // 'cover' | 'toc'
 
   // Load documents when component mounts or project changes
   const loadDocuments = useCallback(async () => {
@@ -42,7 +43,7 @@ const HybridBinderGenerator = ({ project, onProjectUpdate }) => {
     if (project?.id) {
       loadDocuments();
     }
-  }, [project?.id, loadDocuments]);
+  }, [project?.id, project?.cover_page_data, loadDocuments]);
 
   const handleGenerateWeb = () => {
     console.log('handleGenerateWeb called with:', {
@@ -59,6 +60,14 @@ const HybridBinderGenerator = ({ project, onProjectUpdate }) => {
     setGeneratedWeb(true);
     setError(null);
   };
+
+  // Auto-generate web binder once documents have loaded
+  useEffect(() => {
+    if (!generatedWeb && Array.isArray(documents) && documents.length > 0) {
+      setError(null);
+      setGeneratedWeb(true);
+    }
+  }, [documents, generatedWeb]);
 
   const handleGeneratePDF = async () => {
     console.log('Starting ENHANCED PDF generation...');
@@ -128,60 +137,9 @@ const HybridBinderGenerator = ({ project, onProjectUpdate }) => {
     }
   };
 
-  const ModeSelector = () => (
-    <div className="flex items-center space-x-4 mb-6">
-      <button
-        onClick={() => setMode('web')}
-        className={`flex items-center px-4 py-2 rounded-lg transition-colors ${
-          mode === 'web'
-            ? 'bg-black text-white'
-            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-        }`}
-      >
-        <Globe className="h-4 w-4 mr-2" />
-        Web Binder
-      </button>
-      <button
-        onClick={() => setMode('pdf')}
-        className={`flex items-center px-4 py-2 rounded-lg transition-colors ${
-          mode === 'pdf'
-            ? 'bg-black text-white'
-            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-        }`}
-      >
-        <FileText className="h-4 w-4 mr-2" />
-        Enhanced PDF
-      </button>
-      <button
-        onClick={loadDocuments}
-        disabled={loading}
-        className="flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-      >
-        <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-        Refresh
-      </button>
-    </div>
-  );
+  // Mode selector removed per spec
 
-  const DocumentStats = () => (
-    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-      <h4 className="font-medium text-blue-900 mb-2">Project Status</h4>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-        <div className="text-blue-800">
-          <span className="font-medium">{documents.length}</span> Documents
-        </div>
-        <div className="text-blue-800">
-          <span className="font-medium">{structure.sections.filter(s => s.section_type === 'section').length}</span> Sections
-        </div>
-        <div className="text-blue-800">
-          <span className="font-medium">{structure.sections.filter(s => s.section_type === 'subsection').length}</span> Subsections
-        </div>
-        <div className="text-blue-800">
-          <span className="font-medium">{documents.filter(d => d.section_id).length}</span> Organized
-        </div>
-      </div>
-    </div>
-  );
+  // Project status box removed per spec
 
   const WebBinderContent = () => {
     if (!generatedWeb) {
@@ -216,56 +174,84 @@ const HybridBinderGenerator = ({ project, onProjectUpdate }) => {
     // Show the actual web binder when generated
     return (
       <div className="space-y-8">
-        {/* Success Header */}
-        <div className="text-center py-4">
-          <div className="flex items-center justify-center mb-4">
-            <CheckCircle className="h-8 w-8 text-green-500 mr-2" />
-            <h3 className="text-lg font-medium text-gray-900">Web Binder Generated Successfully!</h3>
+        {previewPage === 'cover' ? (
+          <div className="bg-white rounded-lg p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Cover Page</h3>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setPreviewPage('toc')}
+                  className="text-sm text-black hover:underline"
+                  title="Go to Table of Contents"
+                >
+                  Table of Contents →
+                </button>
+              </div>
+            </div>
+            <CoverPageHTML project={project} />
           </div>
-          <button
-            onClick={() => setGeneratedWeb(false)}
-            className="text-sm text-gray-600 hover:text-gray-900 underline"
-          >
-            ← Back to generate options
-          </button>
-        </div>
-
-        {/* Cover Page */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-medium text-gray-900">Cover Page</h3>
-            <button
-              onClick={() => window.print()}
-              className="flex items-center px-3 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Print
-            </button>
-          </div>
-          <CoverPageHTML project={project} />
-        </div>
-
-        {/* Table of Contents */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-medium text-gray-900">Table of Contents</h3>
-            <button
-              onClick={() => window.print()}
-              className="flex items-center px-3 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Print
-            </button>
-          </div>
-          {/* Use the fixed TableOfContentsHTML component */}
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
+        ) : previewPage === 'toc' ? (
+          <div className="bg-white rounded-lg p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Table of Contents</h3>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setPreviewPage('cover')}
+                  className="text-sm text-black hover:underline"
+                  title="Go to Cover Page"
+                >
+                  ← Cover Page
+                </button>
+                <button
+                  onClick={() => setPreviewPage('contact')}
+                  className="text-sm text-black hover:underline"
+                  title="Go to Contact Information"
+                >
+                  Contact Information →
+                </button>
+              </div>
+            </div>
             <TableOfContentsHTML 
               project={project}
               documents={documents}
               structure={structure}
             />
           </div>
-        </div>
+        ) : (
+          <div className="bg-white rounded-lg p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Contact Information</h3>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setPreviewPage('toc')}
+                  className="text-sm text-black hover:underline"
+                  title="Go to Table of Contents"
+                >
+                  ← Table of Contents
+                </button>
+              </div>
+            </div>
+            {/* Contact Information content */}
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+                {renderContactBox('buyer','Buyer')}
+                {renderContactBox('seller','Seller')}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+                {renderContactBox('buyer_attorney',"Buyer's Attorney")}
+                {renderContactBox('seller_attorney',"Seller's Attorney")}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+                {renderContactBox('buyer_broker',"Buyer's Broker")}
+                {renderContactBox('seller_broker',"Seller's Broker")}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+                {renderContactBox('lender','Lender')}
+                {renderContactBox('escrow_agent','Escrow Agent')}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -329,18 +315,70 @@ const HybridBinderGenerator = ({ project, onProjectUpdate }) => {
     </div>
   );
 
+  // Helpers to render Contact Info boxes (mirrors client view)
+  const renderContactBox = (key, label) => {
+    // Prefer cover_page_data.contact_info if present
+    let cpd = project?.cover_page_data;
+    if (typeof cpd === 'string') {
+      try { cpd = JSON.parse(cpd); } catch (_) { cpd = {}; }
+    }
+    let contactInfo = cpd?.contact_info || project?.contact_info || {};
+    // Fallback: flat fields
+    const flatFallback = {
+      buyer: project?.buyer,
+      seller: project?.seller,
+      buyer_attorney: project?.buyer_attorney,
+      seller_attorney: project?.seller_attorney,
+      buyer_broker: project?.buyer_broker,
+      seller_broker: project?.seller_broker,
+      lender: project?.lender,
+      title_company: project?.title_company,
+      escrow_agent: project?.escrow_agent
+    };
+    const baseRaw = contactInfo[key] || (flatFallback[key] ? { company: flatFallback[key] } : {});
+    const normalize = (v) => (v == null ? '' : String(v));
+    const addressParts = [];
+    const line1 = normalize(baseRaw.address_line1 || baseRaw.address || '');
+    const line2 = normalize(baseRaw.address_line2 || '');
+    const city = normalize(baseRaw.city || '');
+    const state = normalize(baseRaw.state || '');
+    const zip = normalize(baseRaw.zip || '');
+    if (line1) addressParts.push(line1);
+    if (line2) addressParts.push(line2);
+    const cityStateZip = [city, state, zip].filter(Boolean).join(', ').replace(/,\s*,/g, ',');
+    if (cityStateZip) addressParts.push(cityStateZip);
+    const composedAddress = addressParts.join('\n');
+    const base = {
+      ...baseRaw,
+      address: composedAddress
+    };
+    const representativeValue = base.representative || base.representative_name || base.contact || base.name || base.rep || null;
+    const hasAny = !!(base.company || representativeValue || base.address || base.email || base.phone || base.web || (key === 'escrow_agent' && base.file_number));
+    return (
+      <div className="h-full min-h-[180px] border border-gray-200 rounded-lg p-4">
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">{label}</h3>
+        {!hasAny ? (
+          <div className="text-sm text-gray-500">—</div>
+        ) : (
+          <div className="grid grid-cols-1 gap-2 text-sm">
+            {base.company && <div><span className="font-medium">Company:</span> {base.company}</div>}
+            {representativeValue && <div><span className="font-medium">Representative:</span> {representativeValue}</div>}
+            {base.address && <div><span className="font-medium">Address:</span> {base.address}</div>}
+            {base.email && <div><span className="font-medium">Email:</span> {base.email}</div>}
+            {base.phone && <div><span className="font-medium">Phone:</span> {base.phone}</div>}
+            {base.web && <div><span className="font-medium">Web:</span> {base.web}</div>}
+            {key === 'escrow_agent' && base.file_number && (
+              <div><span className="font-medium">File Number:</span> {base.file_number}</div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900">Generate Closing Binder</h2>
-        <p className="text-sm text-gray-600 mt-1">
-          Choose between interactive web format or enhanced PDF with improved table of contents
-        </p>
-      </div>
-
-      <ModeSelector />
-      <DocumentStats />
+      {/* Mode selector removed per spec */}
 
       {/* Content based on mode */}
       <div className="bg-white border border-gray-200 rounded-lg p-6">

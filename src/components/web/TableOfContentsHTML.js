@@ -167,26 +167,6 @@ const TableOfContentsHTML = ({ project, documents, structure }) => {
 
   return (
     <div className="max-w-4xl mx-auto bg-white p-6">
-      {/* Header with Logos */}
-      {logos.length > 0 && (
-        <div className="text-center mb-8 border-b border-gray-200 pb-6">
-          <div className="flex justify-center items-center space-x-8 mb-4">
-            {logos.slice(0, 3).map((logo, index) => (
-              <div key={logo.id || index} className="flex-shrink-0">
-                <img
-                  src={logo.logo_url}
-                  alt={`Company Logo ${index + 1}`}
-                  className="h-12 w-auto object-contain"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                  }}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Table of Contents Title */}
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-black mb-4">TABLE OF CONTENTS</h1>

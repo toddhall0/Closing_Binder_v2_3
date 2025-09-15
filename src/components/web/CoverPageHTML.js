@@ -66,18 +66,85 @@ const CoverPageHTML = ({ project }) => {
     return details.length > 0 ? details.join(', ') : 'Property Address Not Provided';
   };
 
-  // Transaction participants - FIXED TO USE CORRECT FIELD NAMES
-  const getTransactionDetails = () => ({
-    buyer: project?.buyer || 'Not specified',
-    seller: project?.seller || 'Not specified', 
-    attorney: project?.attorney || 'Not specified',
-    lender: project?.lender || 'Not specified',
-    escrowAgent: project?.escrow_agent || 'Not specified',
-    titleCompany: project?.title_company || 'Not specified',
-    realEstateAgent: project?.real_estate_agent || 'Not specified'
-  });
+  // Transaction participants - Prefer data from Property Information (cover_page_data.contact_info)
+  const getTransactionDetails = () => {
+    let cover = project?.cover_page_data;
+    if (typeof cover === 'string') {
+      try { cover = JSON.parse(cover); } catch (_) { cover = null; }
+    }
+    const ci = cover?.contact_info || project?.contact_info || {};
+
+    const readEntry = (entry) => {
+      if (!entry || typeof entry !== 'object') return '';
+      return (
+        entry.company ||
+        entry.name ||
+        entry.representative ||
+        entry.representative_name ||
+        entry.contact ||
+        entry.rep ||
+        ''
+      );
+    };
+
+    // Build values, falling back to legacy flat fields if nothing present
+    const buyer = readEntry(ci.buyer) || (project?.buyer || '');
+    const seller = readEntry(ci.seller) || (project?.seller || '');
+    const lender = readEntry(ci.lender) || (project?.lender || '');
+    const escrowAgent = readEntry(ci.escrow_agent) || (project?.escrow_agent || '');
+    const titleCompany = readEntry(ci.title_company) || (project?.title_company || '');
+    // Attorney: prefer buyer/seller attorney entries, join when both present
+    const buyerAttorney = readEntry(ci.buyer_attorney);
+    const sellerAttorney = readEntry(ci.seller_attorney);
+    const attorney = [buyerAttorney, sellerAttorney].filter(Boolean).join(' | ') || (project?.attorney || '');
+    // Real Estate Agent: prefer buyer/seller broker entries, join when both present
+    const buyerBroker = readEntry(ci.buyer_broker);
+    const sellerBroker = readEntry(ci.seller_broker);
+    const realEstateAgent = [buyerBroker, sellerBroker].filter(Boolean).join(' | ') || (project?.real_estate_agent || '');
+
+    return {
+      buyer: buyer || 'Not specified',
+      seller: seller || 'Not specified',
+      attorney: attorney || 'Not specified',
+      lender: lender || 'Not specified',
+      escrowAgent: escrowAgent || 'Not specified',
+      titleCompany: titleCompany || 'Not specified',
+      realEstateAgent: realEstateAgent || 'Not specified'
+    };
+  };
 
   const transactionDetails = getTransactionDetails();
+
+  // Helper: read full contact info object for a given role from Property Information
+  const getContactInfo = (role) => {
+    let cover = project?.cover_page_data;
+    if (typeof cover === 'string') {
+      try { cover = JSON.parse(cover); } catch (_) { cover = null; }
+    }
+    const ci = cover?.contact_info || project?.contact_info || {};
+    const obj = (ci && typeof ci === 'object' ? ci[role] : null) || {};
+    const normalize = (v) => (v == null ? '' : String(v));
+    const addressParts = [];
+    const line1 = normalize(obj.address_line1 || obj.address || '');
+    const line2 = normalize(obj.address_line2 || '');
+    const city = normalize(obj.city || '');
+    const state = normalize(obj.state || '');
+    const zip = normalize(obj.zip || '');
+    if (line1) addressParts.push(line1);
+    if (line2) addressParts.push(line2);
+    const cityStateZip = [city, state, zip].filter(Boolean).join(', ').replace(/,\s*,/g, ',');
+    if (cityStateZip) addressParts.push(cityStateZip);
+    const composedAddress = addressParts.join('\n');
+    return {
+      company: normalize(obj.company || ''),
+      representative: normalize(obj.representative || obj.representative_name || obj.contact || obj.name || obj.rep || ''),
+      address: composedAddress,
+      email: normalize(obj.email || ''),
+      phone: normalize(obj.phone || ''),
+      web: normalize(obj.web || ''),
+      file_number: normalize(obj.file_number || '')
+    };
+  };
 
   return (
     <div className="max-w-4xl mx-auto bg-white cover-page-container" style={{ minHeight: '11in' }}>
@@ -121,100 +188,57 @@ const CoverPageHTML = ({ project }) => {
         </div>
       )}
 
-      {/* Transaction Details Section - REMOVED HEADING, INLINE FORMAT */}
-      {(project?.purchase_price || project?.loan_amount || project?.closing_date) && (
-        <div className="mb-10 text-center">
-          
-          {/* Purchase Price - Same line, same font */}
-          {project?.purchase_price && (
-            <div className="mb-4">
-              <div className="text-2xl font-bold text-black">
-                Purchase Price: ${project.purchase_price.toLocaleString()}
+      {/* Transaction Details Row: Purchase Price (left), Closing Date (right) */}
+      {(project?.purchase_price || project?.closing_date || project?.loan_amount) && (() => {
+        const raw = project?.purchase_price;
+        const priceNum = typeof raw === 'number' ? raw : parseFloat(String(raw ?? '').replace(/[^0-9.]/g, ''));
+        const formattedPrice = Number.isFinite(priceNum) ? `$${priceNum.toLocaleString()}` : '';
+        const formattedDate = project?.closing_date ? new Date(project.closing_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+        return (
+          <div className="mb-10">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-center">
+              {formattedPrice && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="text-sm text-gray-600 mb-1">Purchase Price</div>
+                  <div className="text-2xl font-bold text-black">{formattedPrice}</div>
+                </div>
+              )}
+              {formattedDate && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="text-sm text-gray-600 mb-1">Closing Date</div>
+                  <div className="text-2xl font-bold text-black">{formattedDate}</div>
+                </div>
+              )}
+            </div>
+            {(transactionDetails.buyer !== 'Not specified' || transactionDetails.seller !== 'Not specified') && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-center mt-4">
+                {transactionDetails.buyer !== 'Not specified' && (
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="text-sm text-gray-600 mb-1">Buyer</div>
+                    <div className="text-2xl font-bold text-black break-words">{transactionDetails.buyer}</div>
+                  </div>
+                )}
+                {transactionDetails.seller !== 'Not specified' && (
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="text-sm text-gray-600 mb-1">Seller</div>
+                    <div className="text-2xl font-bold text-black break-words">{transactionDetails.seller}</div>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
-          
-          {/* Closing Date - Same line, same font */}
-          {project?.closing_date && (
-            <div className="mb-4">
-              <div className="text-2xl font-bold text-black">
-                Closing Date: {new Date(project.closing_date).toLocaleDateString()}
+            )}
+            {project?.loan_amount && (
+              <div className="mt-6 text-center">
+                <div className="inline-block text-center p-4 bg-gray-50 rounded-lg">
+                  <div className="text-2xl font-bold text-black">${typeof project.loan_amount === 'number' ? project.loan_amount.toLocaleString() : String(project.loan_amount)}</div>
+                  <div className="text-sm text-gray-600">Loan Amount</div>
+                </div>
               </div>
-            </div>
-          )}
-          
-          {/* Loan Amount - Keep in box format if exists */}
-          {project?.loan_amount && (
-            <div className="inline-block text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-2xl font-bold text-black">
-                ${project.loan_amount.toLocaleString()}
-              </div>
-              <div className="text-sm text-gray-600">Loan Amount</div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Transaction Parties and Service Providers Section - TIGHTER SPACING */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
-        <div className="space-y-6">
-          <div className="border-l-4 border-black pl-4">
-            <h3 className="text-lg font-semibold text-black mb-4">Transaction Parties</h3>
-            <div className="space-y-3">
-              {transactionDetails.buyer !== 'Not specified' && (
-                <div>
-                  <span className="font-medium text-gray-900">Buyer:</span>
-                  <span className="ml-2 text-gray-700">{transactionDetails.buyer}</span>
-                </div>
-              )}
-              {transactionDetails.seller !== 'Not specified' && (
-                <div>
-                  <span className="font-medium text-gray-900">Seller:</span>
-                  <span className="ml-2 text-gray-700">{transactionDetails.seller}</span>
-                </div>
-              )}
-              {transactionDetails.attorney !== 'Not specified' && (
-                <div>
-                  <span className="font-medium text-gray-900">Attorney:</span>
-                  <span className="ml-2 text-gray-700">{transactionDetails.attorney}</span>
-                </div>
-              )}
-              {transactionDetails.realEstateAgent !== 'Not specified' && (
-                <div>
-                  <span className="font-medium text-gray-900">Real Estate Agent:</span>
-                  <span className="ml-2 text-gray-700">{transactionDetails.realEstateAgent}</span>
-                </div>
-              )}
-            </div>
+            )}
           </div>
-        </div>
+        );
+      })()}
 
-        <div className="space-y-6">
-          <div className="border-l-4 border-black pl-4">
-            <h3 className="text-lg font-semibold text-black mb-4">Service Providers</h3>
-            <div className="space-y-3">
-              {transactionDetails.lender !== 'Not specified' && (
-                <div>
-                  <span className="font-medium text-gray-900">Lender:</span>
-                  <span className="ml-2 text-gray-700">{transactionDetails.lender}</span>
-                </div>
-              )}
-              {transactionDetails.titleCompany !== 'Not specified' && (
-                <div>
-                  <span className="font-medium text-gray-900">Title Company:</span>
-                  <span className="ml-2 text-gray-700">{transactionDetails.titleCompany}</span>
-                </div>
-              )}
-              {transactionDetails.escrowAgent !== 'Not specified' && (
-                <div>
-                  <span className="font-medium text-gray-900">Escrow Agent:</span>
-                  <span className="ml-2 text-gray-700">{transactionDetails.escrowAgent}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Transaction Parties and Service Providers removed per spec */}
 
       {/* Company Logos Section - MUCH BIGGER LOGOS (250x250), TIGHTER SPACING */}
       <div className="mb-10">

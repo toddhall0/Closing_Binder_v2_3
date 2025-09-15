@@ -27,7 +27,7 @@ export const EditProjectModal = ({ isOpen, onClose, project, onUpdateProject, lo
       });
       setErrors({});
       setClientId(project.client_id || '');
-      setClientTerm(project.client_name || '');
+      setClientTerm('');
     }
   }, [project]);
 

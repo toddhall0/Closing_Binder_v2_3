@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import ClientsService from '../../services/clientsService';
-import ClientAccessManagerModal from './ClientAccessManagerModal';
 import { Button } from './Button';
 import CreateClientModal from './CreateClientModal';
 import EditClientModal from './EditClientModal';
@@ -14,10 +13,11 @@ const ClientsDashboard = () => {
   const [creating, setCreating] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const [accessModalOpen, setAccessModalOpen] = useState(false);
   const [activeClient, setActiveClient] = useState(null);
   const [sortBy, setSortBy] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
+
+  // Removed Open action per request; client dashboard can be opened elsewhere
 
   const loadClients = async () => {
     setLoading(true);
@@ -143,7 +143,7 @@ const ClientsDashboard = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name or email"
-            className="block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
+            className="block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors h-10"
           />
         </div>
         <div className="mb-6 flex items-center gap-3">
@@ -174,13 +174,13 @@ const ClientsDashboard = () => {
           <div className="text-sm text-gray-600">No clients found.</div>
         ) : (
           <div className="overflow-x-auto border border-gray-200 rounded-md">
-            <table className="min-w-full table-fixed divide-y divide-gray-200">
+            <table className="min-w-full table-auto divide-y divide-gray-200">
               <colgroup>
                 <col style={{ width: 240 }} />
                 <col style={{ width: 240 }} />
                 <col style={{ width: 200 }} />
                 <col style={{ width: 160 }} />
-                <col style={{ width: 260 }} />
+                <col style={{ width: 1 }} />
               </colgroup>
               <thead className="bg-gray-50">
                 <tr>
@@ -188,7 +188,7 @@ const ClientsDashboard = () => {
                   <th onClick={() => toggleSort('representative')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Representative</th>
                   <th onClick={() => toggleSort('email')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Email</th>
                   <th onClick={() => toggleSort('phone')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Phone</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Actions</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
@@ -198,9 +198,8 @@ const ClientsDashboard = () => {
                     <td className="px-4 py-2 text-sm text-gray-700">{getRepName(c) || '—'}</td>
                     <td className="px-4 py-2 text-sm text-gray-700">{getEmail(c) || '—'}</td>
                     <td className="px-4 py-2 text-sm text-gray-700">{formatPhoneNumber(getRepPhone(c)) || '—'}</td>
-                    <td className="px-4 py-2 text-sm text-gray-700 whitespace-nowrap">
-                      <Button size="xs" variant="info" onClick={() => { setActiveClient(c); setAccessModalOpen(true); }}>Manage</Button>
-                      <Button size="xs" variant="secondary" className="ml-2" onClick={() => { setActiveClient(c); setEditOpen(true); }}>Edit</Button>
+                    <td className="px-2 py-2 text-sm text-gray-700 whitespace-nowrap">
+                      <Button size="xs" variant="primary" onClick={() => { setActiveClient(c); setEditOpen(true); }}>Edit</Button>
                       <Button
                         size="xs"
                         variant="danger"
@@ -225,11 +224,7 @@ const ClientsDashboard = () => {
           </div>
         )}
 
-        <ClientAccessManagerModal
-          isOpen={accessModalOpen}
-          client={activeClient}
-          onClose={() => setAccessModalOpen(false)}
-        />
+        {/* Access manager merged into Edit modal; removed standalone manage modal */}
       </div>
     </>
   );
