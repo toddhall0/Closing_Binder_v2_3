@@ -122,8 +122,30 @@ const ClientCoverPage = ({ binder, logos, onNavigateToTOC, documents = [] }) => 
 
   return (
     <div className="max-w-4xl mx-auto bg-white cover-page-container" style={{ minHeight: '11in' }}>
-      {/* Top Navigation Bar */}
-      <div className="flex justify-between items-center p-6">
+      {/* Navigation (centered table with two cells) */}
+      <div className="p-6 pt-6 pb-2 flex justify-center">
+        <table className="table-fixed w-[420px]">
+          <tbody>
+            <tr>
+              <td className="w-1/2 pr-8 text-right"></td>
+              <td className="w-1/2 pl-8 text-left">
+                <button
+                  onClick={onNavigateToTOC}
+                  className="text-sm text-gray-600 hover:text-black transition-colors duration-200 font-medium flex items-center"
+                >
+                  Table of Contents
+                  <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* Download (kept separate from navigation) */}
+      <div className="px-6 pb-2 flex justify-end">
         <button
           onClick={() => setShowDownloadModal(true)}
           className="text-sm text-gray-600 hover:text-black transition-colors duration-200 font-medium flex items-center"
@@ -132,16 +154,6 @@ const ClientCoverPage = ({ binder, logos, onNavigateToTOC, documents = [] }) => 
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
           Download PDF
-        </button>
-
-        <button
-          onClick={onNavigateToTOC}
-          className="text-sm text-gray-600 hover:text-black transition-colors duration-200 font-medium flex items-center"
-        >
-          Table of Contents
-          <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
         </button>
       </div>
 

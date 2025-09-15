@@ -477,7 +477,7 @@ static async getBinderByAccessCode(accessCode, password = null) {
             const storage_path = d.storage_path || d.file_path || null;
             let url = null;
             if (storage_path) {
-              url = `${process.env.REACT_APP_SUPABASE_URL}/storage/v1/object/public/documents/${String(storage_path).replace(/^documents\//, '')}`;
+              url = `${process.env.REACT_APP_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/documents/${String(storage_path).replace(/^documents\//, '')}`;
             } else if (d.file_url) {
               url = d.file_url;
             }

@@ -34,7 +34,7 @@ const GenerateBinder = ({ project, onProjectUpdate }) => {
     },
     {
       id: 'hybrid',
-      name: 'Preview Binder',
+      name: 'Preview/Share Binder',
       icon: Globe,
       component: HybridBinderGenerator,
       description: 'Generate the interactive web binder and PDF'

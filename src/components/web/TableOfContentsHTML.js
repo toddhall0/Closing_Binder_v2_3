@@ -115,7 +115,7 @@ const TableOfContentsHTML = ({ project, documents, structure }) => {
     
     if (doc.storage_path) {
       // New format: construct URL from storage path
-      const baseUrl = process.env.REACT_APP_SUPABASE_URL;
+      const baseUrl = process.env.REACT_APP_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
       documentUrl = `${baseUrl}/storage/v1/object/public/documents/${doc.storage_path}`;
     } else if (doc.file_url) {
       // Legacy format: use existing file_url
@@ -169,7 +169,6 @@ const TableOfContentsHTML = ({ project, documents, structure }) => {
     <div className="max-w-4xl mx-auto bg-white p-6">
       {/* Table of Contents Title */}
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-black mb-4">TABLE OF CONTENTS</h1>
         
         {/* Project Title */}
         {project?.title && (

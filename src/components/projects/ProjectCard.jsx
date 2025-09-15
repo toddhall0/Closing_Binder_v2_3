@@ -176,7 +176,7 @@ Your complete Routes section should look something like this:
     // Fallback: construct from storage naming convention if we only have the filename
     // Expected storage path: images/<user_id>/projects/<project_id>/photos/<fileName>
     if (project?.property_photo_name && project?.user_id && project?.id) {
-      const baseUrl = process.env.REACT_APP_SUPABASE_URL;
+      const baseUrl = process.env.REACT_APP_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
       const path = `images/${project.user_id}/projects/${project.id}/photos/${project.property_photo_name}`;
       return `${baseUrl}/storage/v1/object/public/${path}`;
     }

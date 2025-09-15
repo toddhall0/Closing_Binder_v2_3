@@ -8,8 +8,9 @@ import { Globe, FileText, Download, CheckCircle } from 'lucide-react';
 import { documentOrganizationService } from '../utils/documentOrganizationService';
 import CoverPageHTML from './web/CoverPageHTML';
 import TableOfContentsHTML from './web/TableOfContentsHTML';
+import PublishBinderButton from './projects/PublishBinderButton';
 
-const HybridBinderGenerator = ({ project, onProjectUpdate }) => {
+const HybridBinderGenerator = ({ project, onProjectUpdate, onNavigateToProjectDetails }) => {
   const [mode] = useState('web'); // Fixed to web mode (buttons removed)
   const [documents, setDocuments] = useState([]);
   const [structure, setStructure] = useState({ sections: [], documents: [] });
@@ -176,60 +177,129 @@ const HybridBinderGenerator = ({ project, onProjectUpdate }) => {
       <div className="space-y-8">
         {previewPage === 'cover' ? (
           <div className="bg-white rounded-lg p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-gray-900">Cover Page</h3>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setPreviewPage('toc')}
-                  className="text-sm text-black hover:underline"
-                  title="Go to Table of Contents"
-                >
-                  Table of Contents →
-                </button>
-              </div>
+            {/* Top bar: left Edit button, right Publish button */}
+            <div className="mb-2 flex items-center justify-between">
+              <button
+                onClick={() => onNavigateToProjectDetails && onNavigateToProjectDetails()}
+                className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-sm"
+              >
+                Edit Project Details
+              </button>
+              <PublishBinderButton project={project} documents={documents} sections={structure.sections} />
+            </div>
+            <div className="mb-4 flex justify-center">
+              <table className="table-fixed w-[420px]">
+                <tbody>
+                  <tr>
+                    <td className="w-1/2 pr-8 text-right"></td>
+                    <td className="w-1/2 pl-8 text-left">
+                      <button
+                        onClick={() => setPreviewPage('toc')}
+                        className="text-sm text-black hover:underline"
+                        title="Go to Table of Contents"
+                      >
+                        Table of Contents →
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
             <CoverPageHTML project={project} />
+            {/* Footer bar: left Edit button, right Publish button */}
+            <div className="mt-6 pt-4 border-t border-gray-200 flex items-center justify-between">
+              <button
+                onClick={() => onNavigateToProjectDetails && onNavigateToProjectDetails()}
+                className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-sm"
+              >
+                Edit Project Details
+              </button>
+              <PublishBinderButton project={project} documents={documents} sections={structure.sections} />
+            </div>
           </div>
         ) : previewPage === 'toc' ? (
           <div className="bg-white rounded-lg p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-gray-900">Table of Contents</h3>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setPreviewPage('cover')}
-                  className="text-sm text-black hover:underline"
-                  title="Go to Cover Page"
-                >
-                  ← Cover Page
-                </button>
-                <button
-                  onClick={() => setPreviewPage('contact')}
-                  className="text-sm text-black hover:underline"
-                  title="Go to Contact Information"
-                >
-                  Contact Information →
-                </button>
-              </div>
+            {/* Top bar: left Edit button, right Publish button */}
+            <div className="mb-2 flex items-center justify-between">
+              <button
+                onClick={() => onNavigateToProjectDetails && onNavigateToProjectDetails()}
+                className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-sm"
+              >
+                Edit Project Details
+              </button>
+              <PublishBinderButton project={project} documents={documents} sections={structure.sections} />
+            </div>
+            <div className="mb-4 flex justify-center">
+              <table className="table-fixed w-[420px]">
+                <tbody>
+                  <tr>
+                    <td className="w-1/2 pr-8 text-right">
+                      <button
+                        onClick={() => setPreviewPage('cover')}
+                        className="text-sm text-black hover:underline"
+                        title="Go to Cover Page"
+                      >
+                        ← Cover Page
+                      </button>
+                    </td>
+                    <td className="w-1/2 pl-8 text-left">
+                      <button
+                        onClick={() => setPreviewPage('contact')}
+                        className="text-sm text-black hover:underline"
+                        title="Go to Contact Information"
+                      >
+                        Contact Information →
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
             <TableOfContentsHTML 
               project={project}
               documents={documents}
               structure={structure}
             />
+            {/* Footer bar: left Edit button, right Publish button */}
+            <div className="mt-6 pt-4 border-t border-gray-200 flex items-center justify-between">
+              <button
+                onClick={() => onNavigateToProjectDetails && onNavigateToProjectDetails()}
+                className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-sm"
+              >
+                Edit Project Details
+              </button>
+              <PublishBinderButton project={project} documents={documents} sections={structure.sections} />
+            </div>
           </div>
         ) : (
           <div className="bg-white rounded-lg p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-gray-900">Contact Information</h3>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setPreviewPage('toc')}
-                  className="text-sm text-black hover:underline"
-                  title="Go to Table of Contents"
-                >
-                  ← Table of Contents
-                </button>
-              </div>
+            {/* Top bar: left Edit button, right Publish button */}
+            <div className="mb-2 flex items-center justify-between">
+              <button
+                onClick={() => onNavigateToProjectDetails && onNavigateToProjectDetails()}
+                className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-sm"
+              >
+                Edit Project Details
+              </button>
+              <PublishBinderButton project={project} documents={documents} sections={structure.sections} />
+            </div>
+            <div className="mb-4 flex justify-center">
+              <table className="table-fixed w-[420px]">
+                <tbody>
+                  <tr>
+                    <td className="w-1/2 pr-8 text-right">
+                      <button
+                        onClick={() => setPreviewPage('toc')}
+                        className="text-sm text-black hover:underline"
+                        title="Go to Table of Contents"
+                      >
+                        ← Table of Contents
+                      </button>
+                    </td>
+                    <td className="w-1/2 pl-8 text-left"></td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
             {/* Contact Information content */}
             <div className="space-y-6">
@@ -249,6 +319,16 @@ const HybridBinderGenerator = ({ project, onProjectUpdate }) => {
                 {renderContactBox('lender','Lender')}
                 {renderContactBox('escrow_agent','Escrow Agent')}
               </div>
+            </div>
+            {/* Footer bar: left Edit button, right Publish button */}
+            <div className="mt-6 pt-4 border-t border-gray-200 flex items-center justify-between">
+              <button
+                onClick={() => onNavigateToProjectDetails && onNavigateToProjectDetails()}
+                className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-sm"
+              >
+                Edit Project Details
+              </button>
+              <PublishBinderButton project={project} documents={documents} sections={structure.sections} />
             </div>
           </div>
         )}

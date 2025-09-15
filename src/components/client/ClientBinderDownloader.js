@@ -80,8 +80,8 @@ const ClientBinderDownloader = ({
         // Import Supabase dynamically to avoid potential issues
         const { createClient } = await import('@supabase/supabase-js');
         const supabase = createClient(
-          process.env.REACT_APP_SUPABASE_URL,
-          process.env.REACT_APP_SUPABASE_ANON_KEY
+          process.env.REACT_APP_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL,
+          process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
         );
 
         const { data, error } = await supabase.storage
@@ -294,7 +294,7 @@ const ClientBinderDownloader = ({
             if (d?.file_url) return d.file_url;
             if (d?.file_path) {
               if (/^https?:\/\//i.test(d.file_path)) return d.file_path;
-              const baseUrl = process.env.REACT_APP_SUPABASE_URL;
+              const baseUrl = process.env.REACT_APP_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
               return `${baseUrl}/storage/v1/object/public/documents/${String(d.file_path).replace(/^documents\//, '')}`;
             }
             return null;
@@ -338,7 +338,7 @@ const ClientBinderDownloader = ({
             if (d?.file_url) return d.file_url;
             if (d?.file_path) {
               if (/^https?:\/\//i.test(d.file_path)) return d.file_path;
-              const baseUrl = process.env.REACT_APP_SUPABASE_URL;
+              const baseUrl = process.env.REACT_APP_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
               return `${baseUrl}/storage/v1/object/public/documents/${String(d.file_path).replace(/^documents\//, '')}`;
             }
             return null;

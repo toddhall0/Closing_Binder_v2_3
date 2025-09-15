@@ -492,7 +492,7 @@ const ProjectDetail = () => {
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            Preview Binder
+            Preview/Share Binder
           </button>
         </nav>
       </div>
@@ -772,6 +772,7 @@ const ProjectDetail = () => {
       onProjectUpdate={(updatedProject) => {
         try { setProject(updatedProject); } catch {}
       }}
+      onNavigateToProjectDetails={() => setActiveTab('binder')}
     />
   </div>
 )}

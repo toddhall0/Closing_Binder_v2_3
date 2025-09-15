@@ -164,14 +164,21 @@ const ClientBinderViewer = () => {
     };
     return (
       <div className="max-w-4xl mx-auto bg-white p-6">
-        <div className="mb-4 text-left">
-          <button onClick={() => setCurrentView('toc')} className="text-sm text-blue-600 hover:text-blue-800 underline">
-            <span className="mr-1">&lt;</span>Back to Table of Contents
-          </button>
+        <div className="mb-4 flex justify-center">
+          <table className="table-fixed w-[420px]">
+            <tbody>
+              <tr>
+                <td className="w-1/2 pr-8 text-right">
+                  <button onClick={() => setCurrentView('toc')} className="text-sm text-blue-600 hover:text-blue-800 underline">
+                    <span className="mr-1">&lt;</span>Back to Table of Contents
+                  </button>
+                </td>
+                <td className="w-1/2 pl-8 text-left"></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-black">Contact Information</h1>
-        </div>
+        <div className="text-center mb-6" />
         <div className="space-y-6">
           {/* Row 1: Buyer | Seller */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
@@ -275,7 +282,7 @@ const ClientBinderViewer = () => {
 
     let url = null;
     if (storage_path) {
-      url = `${process.env.REACT_APP_SUPABASE_URL}/storage/v1/object/public/documents/${String(storage_path).replace(/^documents\//, '')}`;
+      url = `${process.env.REACT_APP_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/documents/${String(storage_path).replace(/^documents\//, '')}`;
     } else if (file_url) {
       url = file_url;
     }

@@ -18,10 +18,10 @@ const useWebBinderGeneration = () => {
     }
     if (document.storage_path) {
       // Add your Supabase URL generation logic here
-      return `${process.env.REACT_APP_SUPABASE_URL}/storage/v1/object/public/documents/${document.storage_path}`;
+      return `${process.env.REACT_APP_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/documents/${document.storage_path}`;
     }
     if (document.file_path) {
-      return `${process.env.REACT_APP_SUPABASE_URL}/storage/v1/object/public/documents/${document.file_path}`;
+      return `${process.env.REACT_APP_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/documents/${document.file_path}`;
     }
     return null;
   }, []);

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Modal } from '../common/ui/Modal';
 import { Button } from './Button';
 import ClientsService from '../../services/clientsService';
+import EmailService from '../../services/emailService';
 
 const EditClientModal = ({ isOpen, client, onClose, onSaved }) => {
   const [name, setName] = useState('');
@@ -21,6 +22,7 @@ const EditClientModal = ({ isOpen, client, onClose, onSaved }) => {
   const [inviteName, setInviteName] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('viewer');
+  const [inviteNotice, setInviteNotice] = useState('');
 
   useEffect(() => {
     if (isOpen && client) {
@@ -65,8 +67,23 @@ const EditClientModal = ({ isOpen, client, onClose, onSaved }) => {
     setAccessLoading(true);
     setAccessError(null);
     try {
-      const { error } = await ClientsService.inviteClientUser(client.id, inviteEmail, inviteRole);
+      const { data: inviteRow, error } = await ClientsService.inviteClientUser(client.id, inviteEmail, inviteRole);
       if (error) throw error;
+      // Fire-and-forget email invite (best-effort)
+      try {
+        const inviterName = (client?.owner_name) || '';
+        await EmailService.sendClientInvite({
+          toEmail: inviteEmail,
+          clientName: client?.name || '',
+          clientSlug: client?.slug || null,
+          inviterName,
+        });
+        setInviteNotice(`Invite sent to ${inviteEmail}`);
+        setTimeout(() => setInviteNotice(''), 3000);
+      } catch (emailErr) {
+        // Show a non-blocking error if email delivery fails
+        setAccessError('Invite created, but email delivery failed.');
+      }
       setInviteName('');
       setInviteEmail('');
       setInviteRole('viewer');
@@ -192,6 +209,9 @@ const EditClientModal = ({ isOpen, client, onClose, onSaved }) => {
                 </div>
                 <div className="sm:col-span-7">
                   <Button type="submit" loading={accessLoading} disabled={accessLoading}>Invite</Button>
+                  {inviteNotice && (
+                    <span className="ml-3 text-sm text-green-700">{inviteNotice}</span>
+                  )}
                 </div>
               </form>
               <div className="border border-gray-200 rounded">

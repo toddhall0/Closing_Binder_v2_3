@@ -89,7 +89,7 @@ const ClientTableOfContents = ({
 
     // Try storage_path (new format)
     if (!documentUrl && doc.storage_path) {
-      const baseUrl = process.env.REACT_APP_SUPABASE_URL;
+      const baseUrl = process.env.REACT_APP_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
       documentUrl = `${baseUrl}/storage/v1/object/public/documents/${doc.storage_path}`;
     }
 
@@ -103,7 +103,7 @@ const ClientTableOfContents = ({
       if (/^https?:\/\//i.test(doc.file_path)) {
         documentUrl = doc.file_path;
       } else {
-        const baseUrl = process.env.REACT_APP_SUPABASE_URL;
+        const baseUrl = process.env.REACT_APP_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
         documentUrl = `${baseUrl}/storage/v1/object/public/${doc.file_path.startsWith('documents/') ? '' : ''}documents/${doc.file_path.replace(/^documents\//, '')}`;
       }
     }
@@ -168,25 +168,35 @@ const ClientTableOfContents = ({
 
   return (
     <div className="max-w-4xl mx-auto bg-white p-6">
-      {/* Table of Contents Title - exactly like HTML TOC */}
+      {/* Header area without left title */}
       <div className="mb-8">
         {onNavigateToCover && (
-          <div className="mb-4 flex items-center justify-between">
-            <button
-              onClick={onNavigateToCover}
-              className="text-sm text-blue-600 hover:text-blue-800 underline"
-            >
-              <span className="mr-1">&lt;</span>Back to Cover Page
-            </button>
-            <button
-              onClick={() => (typeof window !== 'undefined') && window.dispatchEvent(new CustomEvent('navigate-client-contact'))}
-              className="text-sm text-blue-600 hover:text-blue-800 underline"
-            >
-              Contact Information<span className="ml-1">&gt;</span>
-            </button>
+          <div className="mb-4 flex justify-center">
+            <table className="table-fixed w-[420px]">
+              <tbody>
+                <tr>
+                  <td className="w-1/2 pr-8 text-right">
+                    <button
+                      onClick={onNavigateToCover}
+                      className="text-sm text-blue-600 hover:text-blue-800 underline"
+                    >
+                      <span className="mr-1">&lt;</span>Back to Cover Page
+                    </button>
+                  </td>
+                  <td className="w-1/2 pl-8 text-left">
+                    <button
+                      onClick={() => (typeof window !== 'undefined') && window.dispatchEvent(new CustomEvent('navigate-client-contact'))}
+                      className="text-sm text-blue-600 hover:text-blue-800 underline"
+                    >
+                      Contact Information<span className="ml-1">&gt;</span>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         )}
-        <h1 className="text-3xl font-bold text-black mb-4 text-center">TABLE OF CONTENTS</h1>
+        {/* Title removed per request */}
         
         {/* Project Title */}
         {binder?.title && (

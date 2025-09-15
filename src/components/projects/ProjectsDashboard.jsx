@@ -80,6 +80,66 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
   const [sortDir, setSortDir] = useState('asc');
   const [localStateFilter, setLocalStateFilter] = useState('');
 
+  // Column widths for resizable table columns (persisted)
+  const defaultColumnWidths = React.useMemo(() => ({
+    title: 220,
+    state: 90,
+    client_name: 200,
+    buyer_company: 220,
+    seller_company: 220,
+    price: 140,
+    closing_date: 140,
+    actions: 140
+  }), []);
+
+  const [columnWidths, setColumnWidths] = useState(defaultColumnWidths);
+  const resizeRef = React.useRef(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('projects_table_column_widths');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          setColumnWidths((prev) => ({ ...prev, ...parsed }));
+        }
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('projects_table_column_widths', JSON.stringify(columnWidths));
+    } catch {}
+  }, [columnWidths]);
+
+  const startResize = (e, key) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startWidth = Number(columnWidths[key]) || Number(defaultColumnWidths[key]) || 120;
+    resizeRef.current = { key, startX, startWidth };
+
+    const handleMouseMove = (ev) => {
+      if (!resizeRef.current) return;
+      const dx = ev.clientX - resizeRef.current.startX;
+      const raw = resizeRef.current.startWidth + dx;
+      const minWidth = key === 'state' ? 70 : 110;
+      const maxWidth = 600;
+      const next = Math.max(minWidth, Math.min(maxWidth, Math.round(raw)));
+      setColumnWidths((prev) => ({ ...prev, [resizeRef.current.key]: next }));
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      resizeRef.current = null;
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
   const getProjectState = (project) => {
     // Single source of truth precedence:
     // 1) cover_page_data.propertyState
@@ -215,16 +275,53 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
 
   const ColGroup = () => (
     <colgroup>
-      <col style={{ width: 220 }} /> {/* Title */}
-      <col style={{ width: 300 }} /> {/* Address */}
-      <col style={{ width: 90 }} />  {/* State */}
-      <col style={{ width: 200 }} /> {/* Client */}
-      <col style={{ width: 220 }} /> {/* Buyer Company */}
-      <col style={{ width: 220 }} /> {/* Seller Company */}
-      <col style={{ width: 140 }} /> {/* Purchase Price */}
-      <col style={{ width: 140 }} /> {/* Closing Date */}
-      <col style={{ width: 140 }} /> {/* Actions */}
+      <col style={{ width: columnWidths.title }} />
+      <col style={{ width: columnWidths.state }} />
+      <col style={{ width: columnWidths.client_name }} />
+      <col style={{ width: columnWidths.buyer_company }} />
+      <col style={{ width: columnWidths.seller_company }} />
+      <col style={{ width: columnWidths.price }} />
+      <col style={{ width: columnWidths.closing_date }} />
+      <col style={{ width: columnWidths.actions }} />
     </colgroup>
+  );
+
+  const HeaderCell = ({ label, sortKey, onSort }) => (
+    <th
+      onClick={onSort ? () => onSort(sortKey) : undefined}
+      className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none relative"
+    >
+      <span className="pr-2">{label}</span>
+      <span
+        onMouseDown={(e) => startResize(e, sortKey)}
+        className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize bg-transparent hover:bg-gray-300"
+        role="separator"
+        aria-orientation="vertical"
+      />
+    </th>
+  );
+
+  const TableHeader = () => (
+    <thead className="bg-gray-50">
+      <tr>
+        <HeaderCell label="Title" sortKey="title" onSort={toggleSort} />
+        <HeaderCell label="State" sortKey="state" onSort={toggleSort} />
+        <HeaderCell label="Client" sortKey="client_name" onSort={toggleSort} />
+        <HeaderCell label="Buyer Company" sortKey="buyer_company" onSort={toggleSort} />
+        <HeaderCell label="Seller Company" sortKey="seller_company" onSort={toggleSort} />
+        <HeaderCell label="Purchase Price" sortKey="price" onSort={toggleSort} />
+        <HeaderCell label="Closing Date" sortKey="closing_date" onSort={toggleSort} />
+        <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider select-none relative">
+          <span className="pr-2">Actions</span>
+          <span
+            onMouseDown={(e) => startResize(e, 'actions')}
+            className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize bg-transparent hover:bg-gray-300"
+            role="separator"
+            aria-orientation="vertical"
+          />
+        </th>
+      </tr>
+    </thead>
   );
 
   useEffect(() => { setLocalClientId(clientId || ''); }, [clientId]);
@@ -481,19 +578,7 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
               <div className="overflow-x-auto border border-gray-200 rounded-md">
                 <table className="min-w-full table-fixed divide-y divide-gray-200">
                   <ColGroup />
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th onClick={() => toggleSort('title')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Title</th>
-                      <th onClick={() => toggleSort('address')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Address</th>
-                      <th onClick={() => toggleSort('state')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">State</th>
-                      <th onClick={() => toggleSort('client_name')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Client</th>
-                      <th onClick={() => toggleSort('buyer_company')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Buyer Company</th>
-                      <th onClick={() => toggleSort('seller_company')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Seller Company</th>
-                      <th onClick={() => toggleSort('price')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Purchase Price</th>
-                      <th onClick={() => toggleSort('closing_date')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Closing Date</th>
-                      <th className="px-4 py-2" />
-                    </tr>
-                  </thead>
+                  <TableHeader />
                   <tbody className="bg-white divide-y divide-gray-100">
                     {sortedProjects.map((project) => (
                       <tr
@@ -502,7 +587,6 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
                         onClick={() => openProject(project)}
                       >
                         <td className="px-4 py-2 text-sm text-gray-900">{project.title || 'Untitled Project'}</td>
-                        <td className="px-4 py-2 text-sm text-gray-700">{project.property_address || '—'}</td>
                         <td className="px-4 py-2 text-sm text-gray-700">{getProjectState(project) || '—'}</td>
                         <td className="px-4 py-2 text-sm text-gray-700">{getClientName(project) || '—'}</td>
                         <td className="px-4 py-2 text-sm text-gray-700">{getBuyerCompany(project) || '—'}</td>
@@ -535,19 +619,7 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
                 </div>
                 <table className="min-w-full table-fixed divide-y divide-gray-200">
                   <ColGroup />
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th onClick={() => toggleSort('title')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Title</th>
-                      <th onClick={() => toggleSort('address')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Address</th>
-                      <th onClick={() => toggleSort('state')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">State</th>
-                      <th onClick={() => toggleSort('client_name')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Client</th>
-                      <th onClick={() => toggleSort('buyer_company')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Buyer Company</th>
-                      <th onClick={() => toggleSort('seller_company')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Seller Company</th>
-                      <th onClick={() => toggleSort('price')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Purchase Price</th>
-                      <th onClick={() => toggleSort('closing_date')} className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none">Closing Date</th>
-                      <th className="px-4 py-2" />
-                    </tr>
-                  </thead>
+                  <TableHeader />
                   <tbody className="bg-white divide-y divide-gray-100">
                     {group.items.map((project) => (
                       <tr
@@ -556,7 +628,6 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
                         onClick={() => openProject(project)}
                       >
                         <td className="px-4 py-2 text-sm text-gray-900">{project.title || 'Untitled Project'}</td>
-                        <td className="px-4 py-2 text-sm text-gray-700">{project.property_address || '—'}</td>
                         <td className="px-4 py-2 text-sm text-gray-700">{getProjectState(project) || '—'}</td>
                         <td className="px-4 py-2 text-sm text-gray-700">{getClientName(project) || '—'}</td>
                         <td className="px-4 py-2 text-sm text-gray-700">{getBuyerCompany(project) || '—'}</td>
