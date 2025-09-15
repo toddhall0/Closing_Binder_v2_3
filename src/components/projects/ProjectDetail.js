@@ -20,7 +20,7 @@ const ProjectDetail = () => {
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('documents');
+  const [activeTab, setActiveTab] = useState('binder');
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [showUpload, setShowUpload] = useState(false);
@@ -454,7 +454,16 @@ const ProjectDetail = () => {
       {/* Navigation Tabs */}
       <div className="border-b border-gray-200 mb-8">
         <nav className="flex space-x-8">
-          
+          <button
+            onClick={() => setActiveTab('binder')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+              activeTab === 'binder'
+                ? 'border-black text-black'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Project Details
+          </button>
           <button
             onClick={() => setActiveTab('documents')}
             className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
@@ -474,16 +483,6 @@ const ProjectDetail = () => {
             }`}
           >
             Organize Documents
-          </button>
-          <button
-            onClick={() => setActiveTab('binder')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'binder'
-                ? 'border-black text-black'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Project Details
           </button>
           <button
             onClick={() => setActiveTab('preview')}

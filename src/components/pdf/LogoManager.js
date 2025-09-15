@@ -184,7 +184,7 @@ const LogoManager = ({ projectId, logos = [], onLogosChange }) => {
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading || logos.length >= 3}
-          className="inline-flex items-center px-4 py-2 border border-black text-sm font-medium rounded-lg text-black bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="inline-flex items-center px-4 py-2 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <Upload className="h-4 w-4 mr-2" />
           {uploading ? 'Uploading...' : 'Add Logo'}

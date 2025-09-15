@@ -4,8 +4,7 @@
 // ===============================
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Camera, Download, Save } from 'lucide-react';
-import { PDFDownloadLink } from '@react-pdf/renderer';
+import { Camera, Save } from 'lucide-react';
 import CoverPagePDF from './CoverPagePDF';
 import LogoManager from './LogoManager';
 import PropertyPhotoManager from './PropertyPhotoManager';
@@ -14,6 +13,8 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
   const [coverData, setCoverData] = useState({
     title: project?.title || '',
     propertyAddress: project?.property_address || '',
+    propertyCity: project?.property_city || '',
+    propertyCounty: project?.property_county || '',
     propertyState: project?.property_state || '',
     propertyDescription: project?.property_description || '',
     closingDate: project?.closing_date || '',
@@ -103,11 +104,14 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
 
       if (projectData) {
         const formattedPrice = projectData.purchase_price != null ? String(projectData.purchase_price) : '';
+        const coverJson = projectData.cover_page_data && (typeof projectData.cover_page_data === 'string' ? (()=>{ try { return JSON.parse(projectData.cover_page_data); } catch(_) { return {}; } })() : projectData.cover_page_data) || {};
 
         setCoverData({
           title: projectData.title || '',
           propertyAddress: projectData.property_address || '',
-          propertyState: (projectData.property_state || (projectData.cover_page_data && (typeof projectData.cover_page_data === 'string' ? (()=>{ try { return JSON.parse(projectData.cover_page_data); } catch(_) { return {}; } })() : projectData.cover_page_data)?.propertyState) || ''),
+          propertyCity: projectData.property_city || coverJson.propertyCity || '',
+          propertyCounty: projectData.property_county || coverJson.propertyCounty || '',
+          propertyState: projectData.property_state || coverJson.propertyState || '',
           propertyDescription: projectData.property_description || '',
           closingDate: projectData.closing_date || '',
           attorney: projectData.attorney || '',
@@ -116,7 +120,7 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
           seller: projectData.seller || '',
           escrowAgent: projectData.escrow_agent || '',
           purchasePrice: formattedPrice,
-          contact_info: projectData.contact_info || (projectData.cover_page_data && projectData.cover_page_data.contact_info) || {}
+          contact_info: projectData.contact_info || coverJson.contact_info || {}
         });
 
         setPropertyPhoto({
@@ -186,9 +190,14 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
   }, [project?.id]);
 
   const handlePurchasePriceChange = (e) => {
-    const inputValue = e.target.value;
-    const clean = sanitizePriceInput(inputValue);
-    setCoverData(prev => ({ ...prev, purchasePrice: clean }));
+    const raw = e.target.value;
+    const clean = sanitizePriceInput(raw);
+    // Format to $xxx,xxx.xx for display while keeping only digits for state
+    const numeric = clean ? Number(clean) / 100 : 0;
+    const formatted = numeric
+      ? numeric.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+      : '';
+    setCoverData(prev => ({ ...prev, purchasePrice: formatted }));
   };
 
   // Format description with line breaks for display
@@ -211,8 +220,8 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
       const rawPrice = coverData.purchasePrice.replace(/[$,]/g, '');
       const priceValue = rawPrice ? parseFloat(rawPrice) : null;
       
-      // Try save with property_state; if it fails due to missing column, retry without
-      const attemptUpdate = async (includeState) => {
+      // Attempt save with graceful fallback if certain columns don't exist
+      const attemptUpdate = async (includeState, includeCity, includeCounty) => {
         const payload = {
           title: coverData.title,
           property_address: coverData.propertyAddress,
@@ -225,14 +234,18 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
           escrow_agent: coverData.escrowAgent || null,
           purchase_price: priceValue,
           contact_info: coverData.contact_info,
-          // Keep cover_page_data in sync with state selection so list view sees it
+          // Sync to JSON blob for clients and UIs that read here
           cover_page_data: {
             ...(project?.cover_page_data && typeof project.cover_page_data === 'string' ? (()=>{ try { return JSON.parse(project.cover_page_data); } catch(_) { return {}; } })() : (project?.cover_page_data || {})),
-            propertyState: coverData.propertyState || null
+            propertyState: coverData.propertyState || null,
+            propertyCity: coverData.propertyCity || null,
+            propertyCounty: coverData.propertyCounty || null
           },
           updated_at: new Date().toISOString()
         };
         if (includeState) payload.property_state = coverData.propertyState || null;
+        if (includeCity) payload.property_city = coverData.propertyCity || null;
+        if (includeCounty) payload.property_county = coverData.propertyCounty || null;
         return await supabase
           .from('projects')
           .update(payload)
@@ -241,13 +254,28 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
           .single();
       };
 
-      let { data: updatedProject, error } = await attemptUpdate(true);
-      if (error) {
+      let includeState = true;
+      let includeCity = true;
+      let includeCounty = true;
+      let updatedProject, error;
+      let attempts = 0;
+      do {
+        ({ data: updatedProject, error } = await attemptUpdate(includeState, includeCity, includeCounty));
+        if (!error) break;
         const msg = String(error.message || '').toLowerCase();
+        let changed = false;
         if (error.code === '42703' || msg.includes('property_state') || msg.includes('schema cache')) {
-          ({ data: updatedProject, error } = await attemptUpdate(false));
+          if (includeState) { includeState = false; changed = true; }
         }
-      }
+        if (msg.includes('property_city')) {
+          if (includeCity) { includeCity = false; changed = true; }
+        }
+        if (msg.includes('property_county')) {
+          if (includeCounty) { includeCounty = false; changed = true; }
+        }
+        if (!changed) break;
+        attempts += 1;
+      } while (attempts < 3);
 
       if (error) throw error;
 
@@ -292,8 +320,7 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Cover Page Editor</h2>
+      <div className="flex items-center justify-end">
         <div className="flex gap-3">
           <button
             onClick={handleSave}
@@ -303,25 +330,11 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
             <Save className="h-4 w-4 mr-2" />
             {saving ? 'Saving...' : 'Save'}
           </button>
-          
-          {/* Real PDF Download Button */}
-          <PDFDownloadLink
-            document={<CoverPagePDF project={{ cover_page_data: coverData }} logos={logos} propertyPhoto={propertyPhoto} customData={{}} />}
-            fileName={getPDFFileName()}
-            className="inline-flex items-center px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
-          >
-            {({ loading }) => (
-              <>
-                <Download className="h-4 w-4 mr-2" />
-                {loading ? 'Generating PDF...' : 'Download PDF'}
-              </>
-            )}
-          </PDFDownloadLink>
         </div>
       </div>
 
-      {/* Centered preview rail with tabs and slide */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
+      {/* Centered preview rail with tabs and slide (hidden on Project Details) */}
+          <div className="hidden bg-white border border-gray-200 rounded-lg p-6">
         <div className="flex items-center justify-center gap-6 mb-4">
           <button onClick={() => setPreviewMode('cover')} className={`text-sm ${previewMode === 'cover' ? 'font-semibold text-black' : 'text-gray-600 hover:text-black'} underline-offset-4 hover:underline`}>Cover Page</button>
           <button onClick={() => setPreviewMode('toc')} className={`text-sm ${previewMode === 'toc' ? 'font-semibold text-black' : 'text-gray-600 hover:text-black'} underline-offset-4 hover:underline`}>Table of Contents</button>
@@ -588,6 +601,16 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
             <label className="block text-sm font-medium text-gray-700 mb-2">Property Address</label>
             <input type="text" value={coverData.propertyAddress} onChange={(e) => setCoverData(prev => ({ ...prev, propertyAddress: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:border-black" placeholder="Enter property address" />
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Property City</label>
+              <input type="text" value={coverData.propertyCity} onChange={(e) => setCoverData(prev => ({ ...prev, propertyCity: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:border-black" placeholder="Enter property city" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Property County</label>
+              <input type="text" value={coverData.propertyCounty} onChange={(e) => setCoverData(prev => ({ ...prev, propertyCounty: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:border-black" placeholder="Enter property county" />
+            </div>
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Property State</label>
             <select
@@ -812,6 +835,18 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
       })()}
 
       {/* Contact Information table removed as requested; fields above feed PDF contact page */}
+
+      {/* Bottom Save button */}
+      <div className="flex items-center justify-end mt-6">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="inline-flex items-center px-5 py-2 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
+        >
+          <Save className="h-4 w-4 mr-2" />
+          {saving ? 'Saving...' : 'Save'}
+        </button>
+      </div>
     </div>
   );
 };

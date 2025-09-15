@@ -176,7 +176,7 @@ const PropertyPhotoManager = ({ projectId, photo, onPhotoChange }) => {
         {photo?.property_photo_url && (
           <button
             onClick={handleDeletePhoto}
-            className="inline-flex items-center px-3 py-1 border border-red-600 text-sm font-medium rounded text-red-600 bg-white hover:bg-red-50 transition-colors"
+            className="inline-flex items-center px-3 py-1 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 transition-colors"
           >
             <Trash2 className="h-4 w-4 mr-2" />
             Remove
