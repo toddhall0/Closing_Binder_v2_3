@@ -8,7 +8,7 @@ const Footer = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex justify-between items-center">
           <div className="text-text-muted text-sm">
-            © {currentYear} PDF Closing Binder. Professional document management.
+            © {currentYear} Closing Binder Pro. Professional document management.
           </div>
           <div className="text-text-muted text-sm">
             Version 1.0.0

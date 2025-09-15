@@ -17,13 +17,23 @@ const HomeRoute = () => {
       }
       try {
         const email = (user.email || '').toLowerCase();
-        const { data } = await supabase
+        const { data: clientMatch } = await supabase
           .from('clients')
           .select('id')
           .eq('email', email)
           .limit(1)
           .maybeSingle();
-        setRedirect(data ? '/client' : '/dashboard');
+        if (clientMatch) {
+          setRedirect('/client');
+        } else {
+          const { data: invited } = await supabase
+            .from('client_users')
+            .select('id')
+            .eq('email', email)
+            .limit(1)
+            .maybeSingle();
+          setRedirect(invited ? '/client' : '/dashboard');
+        }
       } catch {
         setRedirect('/dashboard');
       }

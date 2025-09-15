@@ -335,7 +335,8 @@ export class ClientDashboardService {
           *,
           projects(title, property_address, cover_photo_url, property_photo_url)
         `)
-        .eq('client_id', client.id)
+        // Include binders linked by client_id OR legacy/email-based association
+        .or(`client_id.eq.${client.id},client_email.eq.${(client.email || '').toLowerCase()}`)
         .eq('is_published', true)
         .eq('is_active', true)
         .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);

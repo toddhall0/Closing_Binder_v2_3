@@ -23,18 +23,42 @@ const Header = () => {
       }
       try {
         const email = user.email.toLowerCase();
-        const { data } = await supabase
+        // Check direct client with slug
+        const { data: client } = await supabase
           .from('clients')
           .select('slug')
           .eq('email', email)
           .limit(1)
           .maybeSingle();
-        if (data) {
+        if (client?.slug) {
           setRole('client');
-          setClientSlug(data.slug);
+          setClientSlug(client.slug);
         } else {
-          setRole('firm');
-          setClientSlug(null);
+          // If invited via client_users, attempt to fetch any client slug they belong to (first match)
+          const { data: invited } = await supabase
+            .from('client_users')
+            .select('client_id')
+            .eq('email', email)
+            .limit(1)
+            .maybeSingle();
+          if (invited?.client_id) {
+            const { data: c } = await supabase
+              .from('clients')
+              .select('slug')
+              .eq('id', invited.client_id)
+              .limit(1)
+              .maybeSingle();
+            if (c?.slug) {
+              setRole('client');
+              setClientSlug(c.slug);
+            } else {
+              setRole('client');
+              setClientSlug(null);
+            }
+          } else {
+            setRole('firm');
+            setClientSlug(null);
+          }
         }
       } catch {
         setRole('firm');
@@ -82,7 +106,7 @@ const Header = () => {
             {/* Logo */}
             <div className="flex items-center">
               <Link to="/" className="text-2xl sm:text-3xl font-semibold text-black hover:text-gray-800">
-                The Bundler
+                Closing Binder Pro
               </Link>
             </div>
 

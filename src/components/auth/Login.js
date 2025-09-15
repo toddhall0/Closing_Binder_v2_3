@@ -1,32 +1,50 @@
 import React from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import LoginForm from './LoginForm';
 import { supabase } from '../../lib/supabase';
 
 const Login = () => {
   const { user, loading } = useAuth();
+  const location = useLocation();
   const [redirectTo, setRedirectTo] = React.useState(null);
 
   React.useEffect(() => {
     const determinePostLoginRoute = async () => {
       if (!loading && user) {
         try {
+          // Honor explicit redirect query param if present
+          const searchParams = new URLSearchParams(location.search);
+          const requested = searchParams.get('redirect');
+          if (requested && requested.startsWith('/')) {
+            setRedirectTo(requested);
+            return;
+          }
           const email = (user.email || '').toLowerCase();
-          const { data } = await supabase
+          const { data: clientMatch } = await supabase
             .from('clients')
             .select('id')
             .eq('email', email)
             .limit(1)
             .maybeSingle();
-          setRedirectTo(data ? '/client' : '/dashboard');
+          if (clientMatch) {
+            setRedirectTo('/client');
+          } else {
+            const { data: invited } = await supabase
+              .from('client_users')
+              .select('id')
+              .eq('email', email)
+              .limit(1)
+              .maybeSingle();
+            setRedirectTo(invited ? '/client' : '/dashboard');
+          }
         } catch {
           setRedirectTo('/dashboard');
         }
       }
     };
     determinePostLoginRoute();
-  }, [user, loading]);
+  }, [user, loading, location.search]);
 
   // Redirect if already authenticated
   if (!loading && user && redirectTo) {
@@ -41,7 +59,7 @@ const Login = () => {
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="text-center">
-          <h2 className="text-3xl font-bold text-black">PDF Closing Binder</h2>
+          <h2 className="text-3xl font-bold text-black">Closing Binder Pro</h2>
           <p className="mt-2 text-sm text-gray-600">
             Don't have an account?{' '}
             <Link 

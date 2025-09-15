@@ -594,11 +594,11 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
                         <td className="px-4 py-2 text-sm text-gray-700">{getPrice(project) != null ? getPrice(project).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : '—'}</td>
                         <td className="px-4 py-2 text-sm text-gray-700">{project.closing_date ? new Date(project.closing_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
                         <td className="px-4 py-2 text-right whitespace-nowrap">
-                          <Button size="xs" variant="primary" onClick={(e) => { e.stopPropagation(); handleEditProject(project); }}>Edit</Button>
+                          <Button size="xs" variant="primary" className="rounded" onClick={(e) => { e.stopPropagation(); handleEditProject(project); }}>Edit</Button>
                           <Button
                             size="xs"
                             variant="danger"
-                            className="ml-2"
+                            className="ml-2 rounded"
                             onClick={(e) => { e.stopPropagation(); openDeleteDialog(project); }}
                             disabled={actionLoading && selectedProject?.id === project.id}
                           >
@@ -635,11 +635,11 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
                         <td className="px-4 py-2 text-sm text-gray-700">{getPrice(project) != null ? getPrice(project).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : '—'}</td>
                         <td className="px-4 py-2 text-sm text-gray-700">{project.closing_date ? new Date(project.closing_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
                         <td className="px-4 py-2 text-right whitespace-nowrap">
-                          <Button size="xs" variant="primary" onClick={(e) => { e.stopPropagation(); handleEditProject(project); }}>Edit</Button>
+                          <Button size="xs" variant="primary" className="rounded" onClick={(e) => { e.stopPropagation(); handleEditProject(project); }}>Edit</Button>
                           <Button
                             size="xs"
                             variant="danger"
-                            className="ml-2"
+                            className="ml-2 rounded"
                             onClick={(e) => { e.stopPropagation(); openDeleteDialog(project); }}
                             disabled={actionLoading && selectedProject?.id === project.id}
                           >

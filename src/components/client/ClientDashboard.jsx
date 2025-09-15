@@ -8,16 +8,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { ClientDashboardService } from '../../services/clientDashboardService';
 import { supabase } from '../../lib/supabase';
 
-const partyOptions = [
-  { key: 'buyer', label: 'Buyer' },
-  { key: 'seller', label: 'Seller' },
-  { key: 'buyer_attorney', label: "Buyer's Attorney" },
-  { key: 'seller_attorney', label: "Seller's Attorney" },
-  { key: 'lender', label: 'Lender' },
-  { key: 'title_company', label: 'Title Company' },
-  { key: 'escrow_agent', label: 'Escrow Agent' }
-];
-
 const ClientDashboard = () => {
   const navigate = useNavigate();
   const { slug } = useParams();
@@ -25,7 +15,7 @@ const ClientDashboard = () => {
   const [client, setClient] = React.useState(null);
   const { binders, loading, error, filters, updateFilters, clearFilters, refresh } = useClientBinders(slug);
   const [isFirmAdmin, setIsFirmAdmin] = React.useState(false);
-  const [viewMode, setViewMode] = React.useState('cards'); // 'cards' | 'list'
+  const [viewMode, setViewMode] = React.useState('list'); // 'cards' | 'list'
   const [sortBy, setSortBy] = React.useState('published_at');
   const [sortDir, setSortDir] = React.useState('desc');
 
@@ -60,7 +50,7 @@ const ClientDashboard = () => {
     loadClient();
   }, [slug]);
 
-  const selectedParties = useMemo(() => new Set(filters.parties || []), [filters.parties]);
+  // Parties filter removed; ignore filters.parties
 
   const getBinderState = (b) => {
     const addr = b?.property_address || b?.projects?.property_address || '';
@@ -80,6 +70,34 @@ const ClientDashboard = () => {
     return isFinite(n) ? n : null;
   };
 
+  const getBinderBuyerCompany = (b) => {
+    try {
+      const c = b?.cover_page_data || {};
+      const buyerFromCover = c?.contact_info?.buyer?.company || c?.buyer || null;
+      return (buyerFromCover || b?.buyer || b?.projects?.buyer || '').toString();
+    } catch (_) {
+      return (b?.buyer || b?.projects?.buyer || '').toString();
+    }
+  };
+
+  const getBinderSellerCompany = (b) => {
+    try {
+      const c = b?.cover_page_data || {};
+      const sellerFromCover = c?.contact_info?.seller?.company || c?.seller || null;
+      return (sellerFromCover || b?.seller || b?.projects?.seller || '').toString();
+    } catch (_) {
+      return (b?.seller || b?.projects?.seller || '').toString();
+    }
+  };
+
+  const getClosingYear = (b) => {
+    const d = getBinderClosingDate(b);
+    if (!d) return '—';
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return '—';
+    return String(dt.getFullYear());
+  };
+
   const sortedBinders = useMemo(() => {
     const list = [...binders];
     const dir = sortDir === 'asc' ? 1 : -1;
@@ -90,9 +108,13 @@ const ClientDashboard = () => {
           av = (a.title || a.projects?.title || '').toLowerCase();
           bv = (b.title || b.projects?.title || '').toLowerCase();
           return av.localeCompare(bv) * dir;
-        case 'address':
-          av = (a.property_address || a.projects?.property_address || '').toLowerCase();
-          bv = (b.property_address || b.projects?.property_address || '').toLowerCase();
+        case 'buyer_company':
+          av = getBinderBuyerCompany(a).toLowerCase();
+          bv = getBinderBuyerCompany(b).toLowerCase();
+          return av.localeCompare(bv) * dir;
+        case 'seller_company':
+          av = getBinderSellerCompany(a).toLowerCase();
+          bv = getBinderSellerCompany(b).toLowerCase();
           return av.localeCompare(bv) * dir;
         case 'state':
           av = getBinderState(a);
@@ -124,11 +146,113 @@ const ClientDashboard = () => {
     }
   };
 
-  const toggleParty = (key) => {
-    const next = new Set(selectedParties);
-    if (next.has(key)) next.delete(key); else next.add(key);
-    updateFilters({ parties: Array.from(next) });
+  // Firm-style resizable columns for list view
+  const defaultColumnWidths = React.useMemo(() => ({
+    title: 240,
+    state: 90,
+    buyer: 220,
+    seller: 220,
+    price: 140,
+    closing_date: 140,
+    actions: 140
+  }), []);
+
+  const [columnWidths, setColumnWidths] = React.useState(defaultColumnWidths);
+  const resizeRef = React.useRef(null);
+
+  const startResize = (e, key) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startWidth = Number(columnWidths[key]) || Number(defaultColumnWidths[key]) || 120;
+    resizeRef.current = { key, startX, startWidth };
+
+    const handleMouseMove = (ev) => {
+      if (!resizeRef.current) return;
+      const dx = ev.clientX - resizeRef.current.startX;
+      const raw = resizeRef.current.startWidth + dx;
+      const minWidth = key === 'state' ? 70 : 110;
+      const maxWidth = 600;
+      const next = Math.max(minWidth, Math.min(maxWidth, Math.round(raw)));
+      setColumnWidths((prev) => ({ ...prev, [resizeRef.current.key]: next }));
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      resizeRef.current = null;
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
   };
+
+  const ColGroup = () => (
+    <colgroup>
+      <col style={{ width: columnWidths.title }} />
+      <col style={{ width: columnWidths.state }} />
+      <col style={{ width: columnWidths.buyer }} />
+      <col style={{ width: columnWidths.seller }} />
+      <col style={{ width: columnWidths.price }} />
+      <col style={{ width: columnWidths.closing_date }} />
+      <col style={{ width: columnWidths.actions }} />
+    </colgroup>
+  );
+
+  const HeaderCell = ({ label, sortKey, widthKey, onSort }) => (
+    <th
+      onClick={onSort ? () => onSort(sortKey) : undefined}
+      className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none relative"
+    >
+      <span className="pr-2">{label}</span>
+      <span
+        onMouseDown={(e) => startResize(e, widthKey || sortKey)}
+        className="absolute top-0 right-0 h-full w-2.5 cursor-col-resize bg-transparent hover:bg-gray-300"
+        role="separator"
+        aria-orientation="vertical"
+      />
+    </th>
+  );
+
+  const TableHeader = () => (
+    <thead className="bg-gray-50">
+      <tr>
+        <HeaderCell label="Title" sortKey="title" widthKey="title" onSort={toggleSort} />
+        <HeaderCell label="State" sortKey="state" widthKey="state" onSort={toggleSort} />
+        <HeaderCell label="Buyer" sortKey="buyer_company" widthKey="buyer" onSort={toggleSort} />
+        <HeaderCell label="Seller" sortKey="seller_company" widthKey="seller" onSort={toggleSort} />
+        <HeaderCell label="Purchase Price" sortKey="price" widthKey="price" onSort={toggleSort} />
+        <HeaderCell label="Closing Date" sortKey="closing_date" widthKey="closing_date" onSort={toggleSort} />
+        <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider select-none relative">
+          <span className="pr-2">Actions</span>
+          <span
+            onMouseDown={(e) => startResize(e, 'actions')}
+            className="absolute top-0 right-0 h-full w-2.5 cursor-col-resize bg-transparent hover:bg-gray-300"
+            role="separator"
+            aria-orientation="vertical"
+          />
+        </th>
+      </tr>
+    </thead>
+  );
+
+  // Grouped list behavior: by state or by closing year
+  const groupedForList = useMemo(() => {
+    if (sortBy !== 'state' && sortBy !== 'closing_date') return null;
+    const groups = [];
+    const keyToIndex = new Map();
+    for (const b of sortedBinders) {
+      let key = '—';
+      if (sortBy === 'state') key = getBinderState(b) || '—';
+      else if (sortBy === 'closing_date') key = getClosingYear(b) || '—';
+      if (!keyToIndex.has(key)) {
+        keyToIndex.set(key, groups.length);
+        groups.push({ key, items: [] });
+      }
+      groups[keyToIndex.get(key)].items.push(b);
+    }
+    return groups;
+  }, [sortedBinders, sortBy]);
 
   const openBinder = (binder) => {
     // Use access_code public viewer; route is already configured
@@ -199,13 +323,16 @@ const ClientDashboard = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-            <input
-              type="text"
-              placeholder="e.g., NY"
+            <select
+              className="block w-full px-3 py-2 border border-gray-300 h-10"
               value={filters.state || ''}
-              onChange={(e) => updateFilters({ state: e.target.value.toUpperCase() })}
-              className="block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
-            />
+              onChange={(e) => updateFilters({ state: e.target.value })}
+            >
+              <option value="">All states</option>
+              {['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'].map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
           </div>
           <div className="flex space-x-2">
             <div>
@@ -229,21 +356,9 @@ const ClientDashboard = () => {
           </div>
         </div>
 
-        {/* Parties */}
+        {/* Clear filters */}
         <div className="mt-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Parties</label>
-          <div className="flex flex-wrap gap-2">
-            {partyOptions.map((p) => (
-              <button
-                key={p.key}
-                onClick={() => toggleParty(p.key)}
-                className={`px-3 py-1.5 text-sm rounded border transition-colors ${selectedParties.has(p.key) ? 'bg-black text-white border-black' : 'bg-white text-gray-800 border-gray-300 hover:bg-gray-50'}`}
-              >
-                {p.label}
-              </button>
-            ))}
-            <Button variant="ghost" size="sm" onClick={clearFilters}>Clear</Button>
-          </div>
+          <Button variant="ghost" size="sm" onClick={clearFilters}>Clear</Button>
         </div>
       </div>
 
@@ -280,43 +395,79 @@ const ClientDashboard = () => {
             ))}
           </div>
         ) : (
-          <div className="overflow-x-auto border border-gray-200 rounded-md">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer" onClick={() => toggleSort('title')}>Title</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer" onClick={() => toggleSort('address')}>Address</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer" onClick={() => toggleSort('state')}>State</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer" onClick={() => toggleSort('price')}>Purchase Price</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer" onClick={() => toggleSort('closing_date')}>Closing Date</th>
-                  <th className="px-4 py-2" />
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-100">
-                {sortedBinders.map((b) => {
-                  const title = b?.title || b?.projects?.title || 'Closing Binder';
-                  const address = b?.property_address || b?.projects?.property_address || '';
-                  const state = getBinderState(b);
-                  const price = getBinderPrice(b);
-                  const closing = getBinderClosingDate(b);
-                  return (
-                    <tr key={b.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 text-sm text-gray-900">{title}</td>
-                      <td className="px-4 py-2 text-sm text-gray-700">{address || '—'}</td>
-                      <td className="px-4 py-2 text-sm text-gray-700">{state || '—'}</td>
-                      <td className="px-4 py-2 text-sm text-gray-700">{price != null ? price.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : '—'}</td>
-                      <td className="px-4 py-2 text-sm text-gray-700">{closing ? new Date(closing).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
-                      <td className="px-4 py-2 text-right">
-                        <button onClick={() => openBinder(b)} className="text-sm text-black hover:underline">Open</button>
-                        {isFirmAdmin && (
-                          <button onClick={() => handleDeleteBinder(b)} className="ml-3 text-sm text-red-600 hover:underline">Remove</button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="space-y-6">
+            {!groupedForList && (
+              <div className="overflow-x-auto border border-gray-200 rounded-md">
+                <table className="min-w-full table-fixed divide-y divide-gray-200">
+                  <ColGroup />
+                  <TableHeader />
+                  <tbody className="bg-white divide-y divide-gray-100">
+                    {sortedBinders.map((b) => {
+                      const title = b?.title || b?.projects?.title || 'Closing Binder';
+                      const state = getBinderState(b);
+                      const buyer = getBinderBuyerCompany(b);
+                      const seller = getBinderSellerCompany(b);
+                      const price = getBinderPrice(b);
+                      const closing = getBinderClosingDate(b);
+                      return (
+                        <tr key={b.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-2 text-sm text-gray-900">{title}</td>
+                          <td className="px-4 py-2 text-sm text-gray-700">{state || '—'}</td>
+                          <td className="px-4 py-2 text-sm text-gray-700">{buyer || '—'}</td>
+                          <td className="px-4 py-2 text-sm text-gray-700">{seller || '—'}</td>
+                          <td className="px-4 py-2 text-sm text-gray-700">{price != null ? price.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : '—'}</td>
+                          <td className="px-4 py-2 text-sm text-gray-700">{closing ? new Date(closing).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
+                          <td className="px-4 py-2 text-right whitespace-nowrap">
+                            <button onClick={() => openBinder(b)} className="px-2.5 py-1 rounded bg-black text-white text-xs">Open</button>
+                            {isFirmAdmin && (
+                              <button onClick={() => handleDeleteBinder(b)} className="ml-3 text-sm text-red-600 hover:underline">Remove</button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {groupedForList && groupedForList.map((group) => (
+              <div key={group.key} className="overflow-x-auto border border-gray-200 rounded-md">
+                <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-800">
+                  {sortBy === 'state' ? `State: ${group.key}` : `Year: ${group.key}`}
+                </div>
+                <table className="min-w-full table-fixed divide-y divide-gray-200">
+                  <ColGroup />
+                  <TableHeader />
+                  <tbody className="bg-white divide-y divide-gray-100">
+                    {group.items.map((b) => {
+                      const title = b?.title || b?.projects?.title || 'Closing Binder';
+                      const state = getBinderState(b);
+                      const buyer = getBinderBuyerCompany(b);
+                      const seller = getBinderSellerCompany(b);
+                      const price = getBinderPrice(b);
+                      const closing = getBinderClosingDate(b);
+                      return (
+                        <tr key={b.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-2 text-sm text-gray-900">{title}</td>
+                          <td className="px-4 py-2 text-sm text-gray-700">{state || '—'}</td>
+                          <td className="px-4 py-2 text-sm text-gray-700">{buyer || '—'}</td>
+                          <td className="px-4 py-2 text-sm text-gray-700">{seller || '—'}</td>
+                          <td className="px-4 py-2 text-sm text-gray-700">{price != null ? price.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : '—'}</td>
+                          <td className="px-4 py-2 text-sm text-gray-700">{closing ? new Date(closing).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
+                          <td className="px-4 py-2 text-right whitespace-nowrap">
+                            <button onClick={() => openBinder(b)} className="px-2.5 py-1 rounded bg-black text-white text-xs">Open</button>
+                            {isFirmAdmin && (
+                              <button onClick={() => handleDeleteBinder(b)} className="ml-3 text-sm text-red-600 hover:underline">Remove</button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ))}
           </div>
         )}
       </div>

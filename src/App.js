@@ -53,7 +53,7 @@ function App() {
               <Route 
                 path="/client/:slug" 
                 element={
-                  <ProtectedRoute allowedRoles={["client","firm"]}>
+                  <ProtectedRoute allowedRoles={["client"]}>
                     <ClientDashboard />
                   </ProtectedRoute>
                 } 

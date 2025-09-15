@@ -46,7 +46,7 @@ const Navbar = () => {
             {/* Logo */}
             <div className="flex items-center">
               <h1 className="text-xl font-semibold text-black">
-                PDF Closing Binder
+                Closing Binder Pro
               </h1>
             </div>
 

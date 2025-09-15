@@ -61,39 +61,53 @@ const EditClientModal = ({ isOpen, client, onClose, onSaved }) => {
     }
   };
 
-  const handleInvite = async (e) => {
-    e.preventDefault();
-    if (!client?.id || !inviteEmail) return;
-    setAccessLoading(true);
-    setAccessError(null);
+const handleInvite = async (e) => {
+  e.preventDefault();
+  if (!client?.id || !inviteEmail) return;
+  setAccessLoading(true);
+  setAccessError(null);
+  try {
+    const { data: inviteRow, error } = await ClientsService.inviteClientUser(client.id, inviteEmail, inviteRole);
+    if (error) throw error;
+    
+    // Fire-and-forget email invite (best-effort)
     try {
-      const { data: inviteRow, error } = await ClientsService.inviteClientUser(client.id, inviteEmail, inviteRole);
-      if (error) throw error;
-      // Fire-and-forget email invite (best-effort)
-      try {
-        const inviterName = (client?.owner_name) || '';
-        await EmailService.sendClientInvite({
-          toEmail: inviteEmail,
-          clientName: client?.name || '',
-          clientSlug: client?.slug || null,
-          inviterName,
-        });
-        setInviteNotice(`Invite sent to ${inviteEmail}`);
-        setTimeout(() => setInviteNotice(''), 3000);
-      } catch (emailErr) {
-        // Show a non-blocking error if email delivery fails
-        setAccessError('Invite created, but email delivery failed.');
-      }
-      setInviteName('');
-      setInviteEmail('');
-      setInviteRole('viewer');
-      await loadMembers();
-    } catch (e) {
-      setAccessError(e.message || 'Failed to add invite');
-    } finally {
-      setAccessLoading(false);
+      const inviterName = (client?.owner_name) || '';
+      const emailPayload = {
+        toEmail: inviteEmail,
+        clientName: client?.name || '',
+        clientSlug: client?.slug || null,
+        inviterName,
+      };
+      
+      console.log('🚀 About to send email with payload:', emailPayload);
+      
+      const result = await EmailService.sendClientInvite(emailPayload);
+      
+      console.log('✅ Email service returned:', result);
+      
+      setInviteNotice(`Invite sent to ${inviteEmail}`);
+      setTimeout(() => setInviteNotice(''), 3000);
+    } catch (emailErr) {
+      console.error('❌ Email error:', emailErr);
+      // Show a non-blocking error if email delivery fails
+      setAccessError('Invite created, but email delivery failed.');
     }
-  };
+    
+    setInviteName('');
+    setInviteEmail('');
+    setInviteRole('viewer');
+    await loadMembers();
+  } catch (e) {
+    setAccessError(e.message || 'Failed to add invite');
+  } finally {
+    setAccessLoading(false);
+  }
+};
+
+
+
+  
 
   const handleRemove = async (id) => {
     if (!window.confirm('Remove this user from access?')) return;
@@ -174,7 +188,7 @@ const EditClientModal = ({ isOpen, client, onClose, onSaved }) => {
               {accessError && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 text-sm rounded">{accessError}</div>
               )}
-              <form onSubmit={handleInvite} className="grid grid-cols-1 sm:grid-cols-7 gap-3 items-end">
+              <div className="grid grid-cols-1 sm:grid-cols-7 gap-3 items-end">
                 <div className="sm:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
                   <input
@@ -208,12 +222,19 @@ const EditClientModal = ({ isOpen, client, onClose, onSaved }) => {
                   </select>
                 </div>
                 <div className="sm:col-span-7">
-                  <Button type="submit" loading={accessLoading} disabled={accessLoading}>Invite</Button>
+  <Button 
+    type="button" 
+    onClick={handleInvite} 
+    loading={accessLoading} 
+    disabled={accessLoading}
+  >
+    Invite
+  </Button>
                   {inviteNotice && (
                     <span className="ml-3 text-sm text-green-700">{inviteNotice}</span>
                   )}
                 </div>
-              </form>
+              </div>
               <div className="border border-gray-200 rounded">
                 <div className="px-3 py-2 bg-gray-50 text-sm font-medium text-gray-700">Authorized Users</div>
                 <div className="divide-y divide-gray-200">

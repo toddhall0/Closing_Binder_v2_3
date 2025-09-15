@@ -199,11 +199,11 @@ const ClientsDashboard = () => {
                     <td className="px-4 py-2 text-sm text-gray-700">{getEmail(c) || '—'}</td>
                     <td className="px-4 py-2 text-sm text-gray-700">{formatPhoneNumber(getRepPhone(c)) || '—'}</td>
                     <td className="px-2 py-2 text-sm text-gray-700 whitespace-nowrap">
-                      <Button size="xs" variant="primary" onClick={() => { setActiveClient(c); setEditOpen(true); }}>Edit</Button>
+                      <Button size="xs" variant="primary" className="rounded" onClick={() => { setActiveClient(c); setEditOpen(true); }}>Edit</Button>
                       <Button
                         size="xs"
                         variant="danger"
-                        className="ml-2"
+                        className="ml-2 rounded"
                         onClick={async () => {
                           if (!window.confirm('Delete this client and all associated data?')) return;
                           const res = await ClientsService.deleteClient(c.id);

@@ -22,13 +22,26 @@ const ProtectedRoute = ({ children, fallback, allowedRoles }) => {
       }
       try {
         const email = (user.email || '').toLowerCase();
-        const { data } = await supabase
+        // Check direct client record
+        const { data: clientMatch } = await supabase
           .from('clients')
           .select('id')
           .eq('email', email)
           .limit(1)
           .maybeSingle();
-        setRole(data ? 'client' : 'firm');
+
+        if (clientMatch) {
+          setRole('client');
+        } else {
+          // Also treat entries in client_users as client role
+          const { data: invited } = await supabase
+            .from('client_users')
+            .select('id')
+            .eq('email', email)
+            .limit(1)
+            .maybeSingle();
+          setRole(invited ? 'client' : 'firm');
+        }
       } catch (e) {
         // Default to firm if lookup fails
         setRole('firm');

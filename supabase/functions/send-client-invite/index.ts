@@ -18,7 +18,7 @@ type InvitePayload = {
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY");
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "no-reply@example.com";
-const APP_NAME = Deno.env.get("APP_NAME") || "Closing Binder";
+const APP_NAME = Deno.env.get("APP_NAME") || "Closing Binder Pro";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,7 +34,9 @@ function assertString(value: unknown, name: string): asserts value is string {
 function buildEmailHtml(payload: InvitePayload): string {
   const appUrl = (payload.appOrigin || "").replace(/\/$/, "");
   const clientUrl = payload.clientSlug ? `${appUrl}/client/${payload.clientSlug}` : `${appUrl}/client`;
-  const loginUrl = `${appUrl}/login`;
+  // Include redirect to client dashboard after auth
+  const loginUrl = `${appUrl}/login?redirect=${encodeURIComponent(payload.clientSlug ? `/client/${payload.clientSlug}` : '/client')}`;
+  const signupUrl = `${appUrl}/signup?redirect=${encodeURIComponent(payload.clientSlug ? `/client/${payload.clientSlug}` : '/client')}`;
   const inviter = payload.inviterName && payload.inviterName.trim().length > 0 ? payload.inviterName : "A firm member";
   const clientLabel = payload.clientName ? ` for <strong>${payload.clientName}</strong>` : "";
 
@@ -50,7 +52,8 @@ function buildEmailHtml(payload: InvitePayload): string {
 
     <p style="margin:0 0 8px 0;">If you don't have an account yet, create one with this email and then log in:</p>
     <ul style="margin:0 0 12px 24px; padding:0;">
-      <li><a href="${loginUrl}" style="color:#111111;">${loginUrl}</a></li>
+      <li><a href="${signupUrl}" style="color:#111111;">Create account</a></li>
+      <li><a href="${loginUrl}" style="color:#111111;">Sign in</a></li>
     </ul>
 
     <p style="margin:24px 0 0 0; font-size:12px; color:#6b7280;">If you did not expect this invitation, you can ignore this email.</p>
