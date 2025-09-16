@@ -80,7 +80,8 @@ export const documentOrganizationService = {
   // Rename a document (updates display name used in TOCs)
   async renameDocument(documentId, newDisplayName) {
     try {
-      const { data, error } = await supabase
+      // First attempt: update both columns (for schemas that have display_name)
+      let { data, error } = await supabase
         .from('documents')
         .update({
           display_name: newDisplayName,
@@ -92,6 +93,24 @@ export const documentOrganizationService = {
         .single();
 
       if (error) {
+        const msg = String(error.message || '').toLowerCase();
+        // Fallback: some schemas may not have display_name; retry updating only name
+        if (error.code === '42703' || msg.includes('display_name') || msg.includes('schema cache')) {
+          const retry = await supabase
+            .from('documents')
+            .update({
+              name: newDisplayName,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', documentId)
+            .select()
+            .single();
+          if (retry.error) {
+            console.error('Error renaming document (fallback failed):', retry.error);
+            throw new Error(retry.error.message);
+          }
+          return retry.data;
+        }
         console.error('Error renaming document:', error);
         throw new Error(error.message);
       }

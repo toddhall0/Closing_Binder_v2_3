@@ -19,12 +19,12 @@ const PublicLanding = () => {
           </p>
           
           <div className="space-x-4">
-            <button
-              onClick={() => setShowAuthModal(true)}
+            <a
+              href="/get-started"
               className="bg-black text-white px-8 py-3 rounded-lg font-medium hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 transition-colors duration-200"
             >
               Get Started
-            </button>
+            </a>
             <button
               onClick={() => setShowAuthModal(true)}
               className="bg-white text-black px-8 py-3 rounded-lg font-medium border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 transition-colors duration-200"

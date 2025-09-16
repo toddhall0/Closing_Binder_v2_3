@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ClientsService from '../../services/clientsService';
 import { Button } from './Button';
 import CreateClientModal from './CreateClientModal';
 import EditClientModal from './EditClientModal';
 
 const ClientsDashboard = () => {
+  const navigate = useNavigate();
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -193,18 +195,19 @@ const ClientsDashboard = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
                 {sortedClients.map((c) => (
-                  <tr key={c.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-2 text-sm text-gray-900">{c.name}</td>
+                  <tr key={c.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => { if (c.slug) navigate(`/client/${c.slug}`); }}>
+                    <td className="px-4 py-2 text-sm text-gray-900 underline decoration-transparent hover:decoration-inherit">{c.name}</td>
                     <td className="px-4 py-2 text-sm text-gray-700">{getRepName(c) || '—'}</td>
                     <td className="px-4 py-2 text-sm text-gray-700">{getEmail(c) || '—'}</td>
                     <td className="px-4 py-2 text-sm text-gray-700">{formatPhoneNumber(getRepPhone(c)) || '—'}</td>
                     <td className="px-2 py-2 text-sm text-gray-700 whitespace-nowrap">
-                      <Button size="xs" variant="primary" className="rounded" onClick={() => { setActiveClient(c); setEditOpen(true); }}>Edit</Button>
+                      <Button size="xs" variant="primary" className="rounded" onClick={(e) => { e.stopPropagation(); setActiveClient(c); setEditOpen(true); }}>Edit</Button>
                       <Button
                         size="xs"
                         variant="danger"
                         className="ml-2 rounded"
-                        onClick={async () => {
+                        onClick={async (e) => {
+                          e.stopPropagation();
                           if (!window.confirm('Delete this client and all associated data?')) return;
                           const res = await ClientsService.deleteClient(c.id);
                           if (!res.success) {

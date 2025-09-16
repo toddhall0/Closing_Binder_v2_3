@@ -25,9 +25,10 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { documentOrganizationService } from '../../../utils/documentOrganizationService';
+import { Modal } from '../../projects/Modal';
 
 // Sortable Document Item Component
-const SortableDocumentItem = ({ document, sectionIndex, docIndex, isDragging, sectionNumber, onRename, onDelete }) => {
+const SortableDocumentItem = ({ document, sectionIndex, docIndex, isDragging, sectionNumber, onRename, onDelete, onOpenRename }) => {
   const {
     attributes,
     listeners,
@@ -76,17 +77,10 @@ const SortableDocumentItem = ({ document, sectionIndex, docIndex, isDragging, se
       </div>
       <div className="flex items-center space-x-2" onPointerDown={(e) => { e.stopPropagation(); }} onMouseDown={(e) => { e.stopPropagation(); }}>
         <button
-          onClick={async (e) => {
+          onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            const next = window.prompt('Rename document', document.display_name || document.name || '');
-            if (!next) return;
-            try {
-              await documentOrganizationService.renameDocument(document.id, next);
-              if (onRename) onRename();
-            } catch (e) {
-              alert(e.message || 'Rename failed');
-            }
+            if (onOpenRename) onOpenRename(document);
           }}
           className="px-2 py-1 text-xs bg-black text-white rounded border border-black hover:bg-gray-800"
         >
@@ -139,6 +133,9 @@ const DocumentOrganization = ({ projectId, onStructureChange }) => {
   const [editingSection, setEditingSection] = useState({ id: null, name: '' });
   const [newSectionName, setNewSectionName] = useState('');
   const [activeId, setActiveId] = useState(null);
+  const [isRenameOpen, setIsRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameDoc, setRenameDoc] = useState(null);
 
   // Configure drag sensors
   const sensors = useSensors(
@@ -225,6 +222,29 @@ const DocumentOrganization = ({ projectId, onStructureChange }) => {
   useEffect(() => {
     loadStructure();
   }, [loadStructure]);
+
+  const openRenameModal = useCallback((doc) => {
+    setRenameDoc(doc);
+    setRenameValue(doc.display_name || doc.name || '');
+    setIsRenameOpen(true);
+  }, []);
+
+  const handleRenameSave = useCallback(async () => {
+    const next = (renameValue || '').trim();
+    if (!renameDoc || !next) {
+      setIsRenameOpen(false);
+      return;
+    }
+    try {
+      await documentOrganizationService.renameDocument(renameDoc.id, next);
+      await loadStructure();
+      setIsRenameOpen(false);
+      setRenameDoc(null);
+      setRenameValue('');
+    } catch (e) {
+      alert(e.message || 'Rename failed');
+    }
+  }, [renameDoc, renameValue, loadStructure]);
 
   const handleDragStart = (event) => {
     setActiveId(event.active.id);
@@ -505,6 +525,7 @@ const DocumentOrganization = ({ projectId, onStructureChange }) => {
                   sectionNumber={sectionNumber}
                   onRename={loadStructure}
                   onDelete={loadStructure}
+                  onOpenRename={openRenameModal}
                 />
               ))}
             </SortableContext>
@@ -557,6 +578,7 @@ const DocumentOrganization = ({ projectId, onStructureChange }) => {
   ];
 
   return (
+    <>
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
@@ -657,6 +679,7 @@ const DocumentOrganization = ({ projectId, onStructureChange }) => {
                           sectionNumber={null}
                           onRename={loadStructure}
                           onDelete={loadStructure}
+                          onOpenRename={openRenameModal}
                         />
                       ))
                     )}
@@ -687,6 +710,46 @@ const DocumentOrganization = ({ projectId, onStructureChange }) => {
         </DragOverlay>
       </div>
     </DndContext>
+
+    {/* Rename Modal */}
+    <Modal
+      isOpen={isRenameOpen}
+      onClose={() => { setIsRenameOpen(false); setRenameDoc(null); }}
+      title="Rename Document"
+      size="sm"
+    >
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">New name</label>
+          <input
+            type="text"
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+            placeholder="Enter document name"
+            autoFocus
+          />
+        </div>
+        <div className="flex justify-end space-x-3">
+          <button
+            type="button"
+            onClick={() => { setIsRenameOpen(false); setRenameDoc(null); }}
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleRenameSave}
+            className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
+            disabled={!renameValue.trim()}
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </Modal>
+    </>
   );
 };
 

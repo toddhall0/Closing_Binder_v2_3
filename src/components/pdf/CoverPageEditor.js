@@ -192,11 +192,16 @@ const CoverPageEditor = ({ project, onProjectUpdate }) => {
   const handlePurchasePriceChange = (e) => {
     const raw = e.target.value;
     const clean = sanitizePriceInput(raw);
-    // Format to $xxx,xxx.xx for display while keeping only digits for state
-    const numeric = clean ? Number(clean) / 100 : 0;
-    const formatted = numeric
-      ? numeric.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
-      : '';
+    if (!clean) {
+      setCoverData(prev => ({ ...prev, purchasePrice: '' }));
+      return;
+    }
+    // Format without converting to cents; preserve up to two decimals as typed
+    const parts = clean.split('.');
+    const intPart = parts[0] || '0';
+    const decPart = parts[1] || '';
+    const formattedInt = Number(intPart).toLocaleString('en-US');
+    const formatted = '$' + formattedInt + (decPart ? '.' + decPart : '');
     setCoverData(prev => ({ ...prev, purchasePrice: formatted }));
   };
 

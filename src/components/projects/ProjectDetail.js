@@ -12,6 +12,7 @@ import DocumentUpload from '../upload/DocumentUpload';
 import DocumentOrganization from '../documents/organization/DocumentOrganization';
 import CoverPageEditor from '../pdf/CoverPageEditor';
 import HybridBinderGenerator from '../HybridBinderGenerator';
+import { Modal } from './Modal';
 import { documentOrganizationService } from '../../utils/documentOrganizationService';
 
 const ProjectDetail = () => {
@@ -26,6 +27,9 @@ const ProjectDetail = () => {
   const [showUpload, setShowUpload] = useState(false);
   const [uploadedDocuments, setUploadedDocuments] = useState([]);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [isRenameOpen, setIsRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameDoc, setRenameDoc] = useState(null);
   const [projectStats, setProjectStats] = useState({
     documents: 0,
     sections: 0,
@@ -121,6 +125,30 @@ const ProjectDetail = () => {
       setLoadingDocuments(false);
     }
   }, [projectId]);
+
+  const openRenameModal = useCallback((document) => {
+    const currentName = document.display_name || document.name || '';
+    setRenameDoc(document);
+    setRenameValue(currentName);
+    setIsRenameOpen(true);
+  }, []);
+
+  const handleRenameSave = useCallback(async () => {
+    const newName = (renameValue || '').trim();
+    if (!renameDoc || !newName) {
+      setIsRenameOpen(false);
+      return;
+    }
+    try {
+      await documentOrganizationService.renameDocument(renameDoc.id, newName);
+      await loadProjectDocuments();
+      setIsRenameOpen(false);
+      setRenameDoc(null);
+      setRenameValue('');
+    } catch (e) {
+      alert(e.message || 'Failed to rename document');
+    }
+  }, [renameDoc, renameValue, loadProjectDocuments]);
 
   const loadProjectStats = useCallback(async () => {
     try {
@@ -722,6 +750,13 @@ const ProjectDetail = () => {
                       
                       <div className="flex items-center space-x-2 ml-4">
                         <button
+                          onClick={() => openRenameModal(document)}
+                          className="px-3 py-1 text-xs bg-white text-black rounded border border-gray-300 hover:bg-gray-50 transition-colors"
+                          title="Rename document"
+                        >
+                          Edit
+                        </button>
+                        <button
                           onClick={() => handleDocumentView(document)}
                           className="px-3 py-1 text-xs bg-black text-white rounded border border-black hover:bg-gray-800 transition-colors"
                           title="View document"
@@ -855,6 +890,45 @@ const ProjectDetail = () => {
           </div>
         </div>
       )}
+
+      {/* Rename Document Modal */}
+      <Modal
+        isOpen={isRenameOpen}
+        onClose={() => { setIsRenameOpen(false); setRenameDoc(null); }}
+        title="Rename Document"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">New name</label>
+            <input
+              type="text"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+              placeholder="Enter document name"
+              autoFocus
+            />
+          </div>
+          <div className="flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={() => { setIsRenameOpen(false); setRenameDoc(null); }}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleRenameSave}
+              className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
+              disabled={!renameValue.trim()}
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

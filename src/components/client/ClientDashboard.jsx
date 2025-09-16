@@ -18,6 +18,7 @@ const ClientDashboard = () => {
   const [viewMode, setViewMode] = React.useState('list'); // 'cards' | 'list'
   const [sortBy, setSortBy] = React.useState('published_at');
   const [sortDir, setSortDir] = React.useState('desc');
+  const [firmLogoUrl, setFirmLogoUrl] = React.useState(null);
 
   React.useEffect(() => {
     const checkRole = async () => {
@@ -36,19 +37,68 @@ const ClientDashboard = () => {
     checkRole();
   }, [slug, user]);
 
-  // Load client details for prominent display
+  // Load client details for prominent display (by slug or first membership)
   React.useEffect(() => {
     const loadClient = async () => {
       try {
-        if (!slug) { setClient(null); return; }
-        const { data, error } = await ClientDashboardService.getClientBySlug(slug);
-        if (!error) setClient(data);
+        if (slug) {
+          const { data, error } = await ClientDashboardService.getClientBySlug(slug);
+          if (!error) setClient(data);
+          return;
+        }
+        // No slug: find a client the current user belongs to via client_users
+        const email = (user?.email || '').toLowerCase();
+        if (!email) { setClient(null); return; }
+        const { data: membership } = await supabase
+          .from('client_users')
+          .select('client_id')
+          .eq('email', email)
+          .limit(1)
+          .maybeSingle();
+        if (membership?.client_id) {
+          const { data: c } = await supabase
+            .from('clients')
+            .select('*')
+            .eq('id', membership.client_id)
+            .maybeSingle();
+          if (c) setClient(c);
+        } else {
+          setClient(null);
+        }
       } catch {
         setClient(null);
       }
     };
     loadClient();
-  }, [slug]);
+  }, [slug, user?.email]);
+
+  // Resolve firm logo URL by listing storage to find the actual object
+  React.useEffect(() => {
+    const loadLogo = async () => {
+      try {
+        const ownerId = client?.owner_id || user?.id || null;
+        if (!ownerId) { setFirmLogoUrl(null); return; }
+        const buckets = ['documents', 'images', 'public', 'public-assets'];
+        const names = ['logo.png', 'logo.jpg', 'logo.jpeg', 'logo.webp'];
+        for (const b of buckets) {
+          const { data, error } = await supabase.storage.from(b).list(`firm-logos/${ownerId}`, { limit: 100 });
+          if (error || !data) continue;
+          const found = data.find((obj) => names.includes(obj.name));
+          if (found) {
+            const { data: pub } = supabase.storage.from(b).getPublicUrl(`firm-logos/${ownerId}/${found.name}`);
+            if (pub?.publicUrl) {
+              setFirmLogoUrl(`${pub.publicUrl}?t=${Date.now()}`);
+              return;
+            }
+          }
+        }
+        setFirmLogoUrl(null);
+      } catch {
+        setFirmLogoUrl(null);
+      }
+    };
+    loadLogo();
+  }, [client?.owner_id, user?.id]);
 
   // Parties filter removed; ignore filters.parties
 
@@ -149,6 +199,7 @@ const ClientDashboard = () => {
   // Firm-style resizable columns for list view
   const defaultColumnWidths = React.useMemo(() => ({
     title: 240,
+    client: 220,
     state: 90,
     buyer: 220,
     seller: 220,
@@ -190,6 +241,7 @@ const ClientDashboard = () => {
   const ColGroup = () => (
     <colgroup>
       <col style={{ width: columnWidths.title }} />
+      <col style={{ width: columnWidths.client }} />
       <col style={{ width: columnWidths.state }} />
       <col style={{ width: columnWidths.buyer }} />
       <col style={{ width: columnWidths.seller }} />
@@ -218,6 +270,7 @@ const ClientDashboard = () => {
     <thead className="bg-gray-50">
       <tr>
         <HeaderCell label="Title" sortKey="title" widthKey="title" onSort={toggleSort} />
+        <HeaderCell label="Client" sortKey="client_name" widthKey="client" onSort={toggleSort} />
         <HeaderCell label="State" sortKey="state" widthKey="state" onSort={toggleSort} />
         <HeaderCell label="Buyer" sortKey="buyer_company" widthKey="buyer" onSort={toggleSort} />
         <HeaderCell label="Seller" sortKey="seller_company" widthKey="seller" onSort={toggleSort} />
@@ -236,15 +289,16 @@ const ClientDashboard = () => {
     </thead>
   );
 
-  // Grouped list behavior: by state or by closing year
+  // Grouped list behavior: by state, closing year, or client
   const groupedForList = useMemo(() => {
-    if (sortBy !== 'state' && sortBy !== 'closing_date') return null;
+    if (sortBy !== 'state' && sortBy !== 'closing_date' && sortBy !== 'client_name') return null;
     const groups = [];
     const keyToIndex = new Map();
     for (const b of sortedBinders) {
       let key = '—';
       if (sortBy === 'state') key = getBinderState(b) || '—';
       else if (sortBy === 'closing_date') key = getClosingYear(b) || '—';
+      else if (sortBy === 'client_name') key = (b.client_name || '').toString() || '—';
       if (!keyToIndex.has(key)) {
         keyToIndex.set(key, groups.length);
         groups.push({ key, items: [] });
@@ -279,7 +333,7 @@ const ClientDashboard = () => {
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="py-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-stretch justify-between">
               <div>
                 {client?.name ? (
                   <>
@@ -293,15 +347,37 @@ const ClientDashboard = () => {
                   </>
                 )}
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setViewMode((m) => (m === 'cards' ? 'list' : 'cards'))}
-                  className="px-3 py-1.5 text-sm rounded border border-gray-300 bg-white hover:bg-gray-50"
-                  disabled={loading}
-                >
-                  {viewMode === 'cards' ? 'List View' : 'Card View'}
-                </button>
-                <Button variant="secondary" size="sm" onClick={refresh} disabled={loading}>Refresh</Button>
+              <div className="flex-none overflow-hidden m-0 p-0">
+                {firmLogoUrl ? (
+                  <img src={firmLogoUrl} alt="Firm Logo" className="block h-auto w-auto max-h-[150px] max-w-[400px] object-contain m-0 p-0" />
+                ) : (
+                  (() => {
+                    const ownerId = client?.owner_id || user?.id || null;
+                    if (!ownerId) return null;
+                    const base = process.env.REACT_APP_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+                    const buckets = ['documents', 'images', 'public', 'public-assets'];
+                    const names = ['logo.png', 'logo.jpg', 'logo.jpeg', 'logo.webp'];
+                    const bust = `t=${Date.now()}`;
+                    return (
+                      <>
+                        {buckets.flatMap((b) => (
+                          names.map((n) => {
+                            const u = `${base}/storage/v1/object/public/${b}/firm-logos/${ownerId}/${n}?${bust}`;
+                            return (
+                              <img
+                                key={`${b}-${n}`}
+                                src={u}
+                                alt="Firm Logo"
+                                className="block h-auto w-auto max-h-[150px] max-w-[400px] object-contain m-0 p-0"
+                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                              />
+                            );
+                          })
+                        ))}
+                      </>
+                    );
+                  })()
+                )}
               </div>
             </div>
           </div>
@@ -356,9 +432,18 @@ const ClientDashboard = () => {
           </div>
         </div>
 
-        {/* Clear filters */}
-        <div className="mt-4">
-          <Button variant="ghost" size="sm" onClick={clearFilters}>Clear</Button>
+        {/* Clear filters and view toggle */}
+        <div className="mt-4 flex items-center gap-3">
+          <Button variant="secondary" size="sm" onClick={clearFilters}>Clear</Button>
+          <Button variant="secondary" size="sm" onClick={refresh} disabled={loading}>Refresh</Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setViewMode((m) => (m === 'cards' ? 'list' : 'cards'))}
+            disabled={loading}
+          >
+            {viewMode === 'cards' ? 'List View' : 'Card View'}
+          </Button>
         </div>
       </div>
 
@@ -385,7 +470,7 @@ const ClientDashboard = () => {
                 {isFirmAdmin && (
                   <button
                     onClick={() => handleDeleteBinder(b)}
-                    className="absolute top-2 right-2 bg-white/90 hover:bg-white text-red-600 border border-red-200 rounded px-2 py-1 text-xs"
+                    className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white border border-red-600 rounded px-2 py-1 text-xs"
                     title="Remove from client dashboard"
                   >
                     Remove
@@ -405,22 +490,28 @@ const ClientDashboard = () => {
                     {sortedBinders.map((b) => {
                       const title = b?.title || b?.projects?.title || 'Closing Binder';
                       const state = getBinderState(b);
+                      const clientName = (b.client_name || '').toString();
                       const buyer = getBinderBuyerCompany(b);
                       const seller = getBinderSellerCompany(b);
                       const price = getBinderPrice(b);
                       const closing = getBinderClosingDate(b);
                       return (
-                        <tr key={b.id} className="hover:bg-gray-50">
+                        <tr
+                          key={b.id}
+                          className="hover:bg-gray-50 cursor-pointer"
+                          onClick={() => openBinder(b)}
+                        >
                           <td className="px-4 py-2 text-sm text-gray-900">{title}</td>
+                          <td className="px-4 py-2 text-sm text-gray-700">{clientName || '—'}</td>
                           <td className="px-4 py-2 text-sm text-gray-700">{state || '—'}</td>
                           <td className="px-4 py-2 text-sm text-gray-700">{buyer || '—'}</td>
                           <td className="px-4 py-2 text-sm text-gray-700">{seller || '—'}</td>
                           <td className="px-4 py-2 text-sm text-gray-700">{price != null ? price.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : '—'}</td>
                           <td className="px-4 py-2 text-sm text-gray-700">{closing ? new Date(closing).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
                           <td className="px-4 py-2 text-right whitespace-nowrap">
-                            <button onClick={() => openBinder(b)} className="px-2.5 py-1 rounded bg-black text-white text-xs">Open</button>
+                            <button onClick={(e) => { e.stopPropagation(); openBinder(b); }} className="px-2.5 py-1 rounded bg-black text-white text-xs">Open</button>
                             {isFirmAdmin && (
-                              <button onClick={() => handleDeleteBinder(b)} className="ml-3 text-sm text-red-600 hover:underline">Remove</button>
+                              <button onClick={(e) => { e.stopPropagation(); handleDeleteBinder(b); }} className="ml-3 px-2.5 py-1 rounded bg-red-600 text-white text-xs hover:bg-red-700">Remove</button>
                             )}
                           </td>
                         </tr>
@@ -434,7 +525,7 @@ const ClientDashboard = () => {
             {groupedForList && groupedForList.map((group) => (
               <div key={group.key} className="overflow-x-auto border border-gray-200 rounded-md">
                 <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-800">
-                  {sortBy === 'state' ? `State: ${group.key}` : `Year: ${group.key}`}
+                  {sortBy === 'state' ? `State: ${group.key}` : sortBy === 'closing_date' ? `Year: ${group.key}` : `Client: ${group.key}`}
                 </div>
                 <table className="min-w-full table-fixed divide-y divide-gray-200">
                   <ColGroup />
@@ -443,22 +534,28 @@ const ClientDashboard = () => {
                     {group.items.map((b) => {
                       const title = b?.title || b?.projects?.title || 'Closing Binder';
                       const state = getBinderState(b);
+                      const clientName = (b.client_name || '').toString();
                       const buyer = getBinderBuyerCompany(b);
                       const seller = getBinderSellerCompany(b);
                       const price = getBinderPrice(b);
                       const closing = getBinderClosingDate(b);
                       return (
-                        <tr key={b.id} className="hover:bg-gray-50">
+                        <tr
+                          key={b.id}
+                          className="hover:bg-gray-50 cursor-pointer"
+                          onClick={() => openBinder(b)}
+                        >
                           <td className="px-4 py-2 text-sm text-gray-900">{title}</td>
+                          <td className="px-4 py-2 text-sm text-gray-700">{clientName || '—'}</td>
                           <td className="px-4 py-2 text-sm text-gray-700">{state || '—'}</td>
                           <td className="px-4 py-2 text-sm text-gray-700">{buyer || '—'}</td>
                           <td className="px-4 py-2 text-sm text-gray-700">{seller || '—'}</td>
                           <td className="px-4 py-2 text-sm text-gray-700">{price != null ? price.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : '—'}</td>
                           <td className="px-4 py-2 text-sm text-gray-700">{closing ? new Date(closing).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
                           <td className="px-4 py-2 text-right whitespace-nowrap">
-                            <button onClick={() => openBinder(b)} className="px-2.5 py-1 rounded bg-black text-white text-xs">Open</button>
+                            <button onClick={(e) => { e.stopPropagation(); openBinder(b); }} className="px-2.5 py-1 rounded bg-black text-white text-xs">Open</button>
                             {isFirmAdmin && (
-                              <button onClick={() => handleDeleteBinder(b)} className="ml-3 text-sm text-red-600 hover:underline">Remove</button>
+                              <button onClick={(e) => { e.stopPropagation(); handleDeleteBinder(b); }} className="ml-3 px-2.5 py-1 rounded bg-red-600 text-white text-xs hover:bg-red-700">Remove</button>
                             )}
                           </td>
                         </tr>

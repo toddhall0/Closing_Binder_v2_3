@@ -205,6 +205,17 @@ export class ClientDashboardService {
         throw new Error('User not authenticated');
       }
 
+      const emailLower = (user.email || '').toLowerCase();
+      // Find client memberships for this email (invited users)
+      let memberClientIds = [];
+      try {
+        const { data: memberships } = await supabase
+          .from('client_users')
+          .select('client_id')
+          .eq('email', emailLower);
+        memberClientIds = (memberships || []).map(r => r.client_id).filter(Boolean);
+      } catch {}
+
       const toISO = (s) => {
         if (!s) return null;
         const t = String(s).trim();
@@ -226,9 +237,17 @@ export class ClientDashboardService {
           projects(title, property_address, cover_photo_url, property_photo_url)
         `)
         .eq('is_published', true)
-        .eq('is_active', true)
-        // RLS expected to limit by client; also add defensive filter by email if available
-        .or(`client_email.eq.${user.email},user_id.eq.${user.id})`);
+        .eq('is_active', true);
+
+      // Access control: show binders where this email is the client_email OR invited via client_users
+      const orFilters = [];
+      if (emailLower) orFilters.push(`client_email.eq.${emailLower}`);
+      if (memberClientIds.length > 0) orFilters.push(`client_id.in.(${memberClientIds.join(',')})`);
+      // Fallback for legacy publisher view (should be filtered by route role, but harmless if no match)
+      orFilters.push(`user_id.eq.${user.id}`);
+      if (orFilters.length > 0) {
+        query = query.or(orFilters.join(','));
+      }
 
       // Not expired
       query = query.or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
