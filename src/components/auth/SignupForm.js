@@ -13,6 +13,8 @@ const SignupForm = ({ onToggleForm, onClose }) => {
     lastName: ''
   });
   const [errors, setErrors] = useState({});
+  const [accountType, setAccountType] = useState('client'); // 'firm' | 'client'
+  const [inviteCode, setInviteCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -54,6 +56,20 @@ const SignupForm = ({ onToggleForm, onClose }) => {
       newErrors.email = 'Please enter a valid email address';
     }
 
+    // Security: enforce invite or firm code
+    if (accountType === 'firm') {
+      const requiredCode = process.env.REACT_APP_FIRM_SIGNUP_CODE;
+      if (!requiredCode) {
+        newErrors.general = 'Firm signup is disabled (missing REACT_APP_FIRM_SIGNUP_CODE).';
+      } else if (inviteCode.trim() !== requiredCode.trim()) {
+        newErrors.inviteCode = 'Invalid firm access code';
+      }
+    } else {
+      if (!inviteCode.trim()) {
+        newErrors.inviteCode = 'Invitation code or email required';
+      }
+    }
+
     if (!formData.password) {
       newErrors.password = 'Password is required';
     } else {
@@ -82,7 +98,9 @@ const SignupForm = ({ onToggleForm, onClose }) => {
     const { error } = await signUp(formData.email, formData.password, {
       first_name: formData.firstName,
       last_name: formData.lastName,
-      full_name: `${formData.firstName} ${formData.lastName}`
+      full_name: `${formData.firstName} ${formData.lastName}`,
+      role: accountType === 'firm' ? 'firm' : 'client',
+      invite_code: inviteCode
     });
 
     if (error) {
@@ -190,6 +208,19 @@ const SignupForm = ({ onToggleForm, onClose }) => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-black mb-2">Account Type</label>
+            <div className="flex gap-4">
+              <label className="inline-flex items-center gap-2 text-sm">
+                <input type="radio" name="acct" value="client" checked={accountType==='client'} onChange={()=>setAccountType('client')} />
+                Client (by invite)
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm">
+                <input type="radio" name="acct" value="firm" checked={accountType==='firm'} onChange={()=>setAccountType('firm')} />
+                New Firm
+              </label>
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="firstName" className="block text-sm font-medium text-black mb-2">
@@ -232,6 +263,27 @@ const SignupForm = ({ onToggleForm, onClose }) => {
                 <p className="text-red-600 text-xs mt-1">{errors.lastName}</p>
               )}
             </div>
+          </div>
+
+          <div>
+            <label htmlFor="inviteCode" className="block text-sm font-medium text-black mb-2">
+              {accountType === 'firm' ? 'Firm Access Code' : 'Invitation Code or Email'}
+            </label>
+            <input
+              id="inviteCode"
+              name="inviteCode"
+              type="text"
+              value={inviteCode}
+              onChange={(e)=>setInviteCode(e.target.value)}
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent ${
+                errors.inviteCode ? 'border-red-300' : 'border-gray-300'
+              }`}
+              placeholder={accountType === 'firm' ? 'Enter your firm’s access code' : 'Invitation token or inviting email'}
+              disabled={isSubmitting}
+            />
+            {errors.inviteCode && (
+              <p className="text-red-600 text-xs mt-1">{errors.inviteCode}</p>
+            )}
           </div>
 
           <div>

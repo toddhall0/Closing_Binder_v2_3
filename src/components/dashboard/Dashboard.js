@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { ProjectsDashboard } from '../projects/ProjectsDashboard';
 import ClientsDashboard from '../projects/ClientsDashboard';
-import FirmLogoManager from '../common/FirmLogoManager';
+import Settings from './Settings';
 
 const Dashboard = () => {
   const [, setSelectedProject] = useState(null);
@@ -33,18 +33,26 @@ const Dashboard = () => {
               >
                 Clients
               </button>
+              <button
+                onClick={() => setTab('settings')}
+                className={`text-sm font-medium py-2 border-b-2 ${tab==='settings' ? 'border-black text-black' : 'border-transparent text-gray-600 hover:text-black'}`}
+              >
+                Settings
+              </button>
             </div>
-            <div className="hidden sm:block">
-              <FirmLogoManager />
-            </div>
+            <div className="hidden sm:block"></div>
           </div>
         </div>
       </div>
 
-      {tab === 'projects' ? (
+      {tab === 'projects' && (
         <ProjectsDashboard onProjectSelect={handleProjectSelect} />
-      ) : (
+      )}
+      {tab === 'clients' && (
         <ClientsDashboard />
+      )}
+      {tab === 'settings' && (
+        <Settings />
       )}
     </div>
   );

@@ -6,8 +6,9 @@ import { supabase } from '../../lib/supabase';
 
 // Usage: <ProtectedRoute allowedRoles={["firm"]}> ... </ProtectedRoute>
 // Roles are derived as:
-// - client: if a row exists in `clients` for user.email
-// - firm: otherwise
+// - client: if a row exists in `clients` for user.email OR an entry exists in `client_users` for user.email
+// - firm: if user is owner/admin (has created clients) OR user_metadata.role === 'firm'
+// - guest: otherwise (no access to firm routes)
 const ProtectedRoute = ({ children, fallback, allowedRoles }) => {
   const { user, loading } = useAuth();
   const [role, setRole] = useState(null);
@@ -40,11 +41,38 @@ const ProtectedRoute = ({ children, fallback, allowedRoles }) => {
             .eq('email', email)
             .limit(1)
             .maybeSingle();
-          setRole(invited ? 'client' : 'firm');
+          if (invited) {
+            setRole('client');
+          } else {
+            // Determine firm role via ownership (has clients) or explicit metadata
+            const { data: anyOwnedClient } = await supabase
+              .from('clients')
+              .select('id')
+              .eq('owner_id', user.id)
+              .limit(1)
+              .maybeSingle();
+
+            const isFirmByMetadata = String(user?.user_metadata?.role || '').toLowerCase() === 'firm' 
+              || user?.user_metadata?.is_firm_owner === true;
+
+            // Membership via firm_users
+            const { data: firmMember } = await supabase
+              .from('firm_users')
+              .select('firm_owner_id')
+              .eq('user_id', user.id)
+              .limit(1)
+              .maybeSingle();
+
+            if (anyOwnedClient || isFirmByMetadata || firmMember) {
+              setRole('firm');
+            } else {
+              setRole('guest');
+            }
+          }
         }
       } catch (e) {
-        // Default to firm if lookup fails
-        setRole('firm');
+        // On error, err on the side of no firm access
+        setRole('guest');
       } finally {
         setCheckingRole(false);
       }

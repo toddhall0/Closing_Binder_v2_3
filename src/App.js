@@ -15,6 +15,7 @@ import Dashboard from './components/dashboard/Dashboard';
 import ProjectDetail from './components/projects/ProjectDetail';
 import DocumentViewer from './components/DocumentViewer';
 import ClientBinderViewer from './components/client/ClientBinderViewer';
+import AcceptInvite from './components/common/AcceptInvite';
 import ClientDashboard from './components/client/ClientDashboard';
 import './index.css';
 
@@ -36,6 +37,7 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/document-viewer" element={<DocumentViewer />} />
+              <Route path="/accept-invite" element={<AcceptInvite />} />
               
               {/* Protected Application Routes */}
               <Route 
