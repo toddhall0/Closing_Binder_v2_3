@@ -78,7 +78,14 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
   const [viewMode, setViewMode] = useState('list'); // 'cards' | 'list'
   const [sortBy, setSortBy] = useState('title');
   const [sortDir, setSortDir] = useState('asc');
+  const [groupBy, setGroupBy] = useState(null); // lock grouping (e.g., by client_sync)
   const [localStateFilter, setLocalStateFilter] = useState('');
+  const [localYearFilter, setLocalYearFilter] = useState('');
+  const [upClientId, setUpClientId] = useState('');
+  const [upState, setUpState] = useState('');
+  const [upYear, setUpYear] = useState('');
+
+  const ACTIONS_COL_WIDTH = 240; // fixed width for Actions column across all tables
 
   // Column widths for resizable table columns (persisted)
   const defaultColumnWidths = React.useMemo(() => ({
@@ -89,7 +96,8 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
     seller_company: 220,
     price: 140,
     closing_date: 140,
-    actions: 140
+    client_sync: 150,
+    actions: ACTIONS_COL_WIDTH
   }), []);
 
   const [columnWidths, setColumnWidths] = useState(defaultColumnWidths);
@@ -124,7 +132,7 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
       if (!resizeRef.current) return;
       const dx = ev.clientX - resizeRef.current.startX;
       const raw = resizeRef.current.startWidth + dx;
-      const minWidth = key === 'state' ? 70 : 110;
+      const minWidth = key === 'state' ? 70 : key === 'actions' ? 200 : key === 'client_sync' ? 120 : 110;
       const maxWidth = 600;
       const next = Math.max(minWidth, Math.min(maxWidth, Math.round(raw)));
       setColumnWidths((prev) => ({ ...prev, [resizeRef.current.key]: next }));
@@ -200,6 +208,20 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
     return Number.isFinite(n) ? n : null;
   };
 
+  const getClientSyncSortValue = (project) => {
+    const st = project?._publishStatus || {};
+    if (!st.hasPublished) return 0; // Not published
+    if (st.hasPendingChanges) return 1; // Changes not published
+    return 2; // Up to date
+  };
+
+  const getClientSyncLabel = (project) => {
+    const st = project?._publishStatus || {};
+    if (st.hasPublished && st.hasPendingChanges) return 'Changes not published';
+    if (st.hasPublished) return 'Up to date';
+    return 'Not published';
+  };
+
   const sortedProjects = React.useMemo(() => {
     const list = [...filteredProjects];
     const dir = sortDir === 'asc' ? 1 : -1;
@@ -230,6 +252,10 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
           av = getSellerCompany(a).toLowerCase();
           bv = getSellerCompany(b).toLowerCase();
           return av.localeCompare(bv) * dir;
+        case 'client_sync':
+          av = getClientSyncSortValue(a);
+          bv = getClientSyncSortValue(b);
+          return (av - bv) * dir;
         case 'price':
           av = getPrice(a) ?? -Infinity;
           bv = getPrice(b) ?? -Infinity;
@@ -246,15 +272,35 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
   }, [filteredProjects, sortBy, sortDir]);
 
   const groupedForList = React.useMemo(() => {
-    if (sortBy !== 'state' && sortBy !== 'client_name' && sortBy !== 'buyer_company' && sortBy !== 'seller_company') return null;
+    const groupable = new Set(['state', 'client_name', 'buyer_company', 'seller_company', 'client_sync']);
+    const groupKey = groupBy || (groupable.has(sortBy) ? sortBy : null);
+    if (!groupKey) return null;
+
+    // Special handling: stable order for client_sync groups
+    if (groupKey === 'client_sync') {
+      const groups = [
+        { key: 'Not published', items: [] },
+        { key: 'Changes not published', items: [] },
+        { key: 'Up to date', items: [] },
+      ];
+      for (const p of sortedProjects) {
+        const label = getClientSyncLabel(p) || '—';
+        const idx = label === 'Not published' ? 0 : label === 'Changes not published' ? 1 : 2;
+        groups[idx].items.push(p);
+      }
+      // Remove empty groups
+      return groups.filter(g => g.items.length > 0);
+    }
+
+    // Generic grouping for other keys
     const groups = [];
     const keyToIndex = new Map();
     for (const p of sortedProjects) {
       let k = '—';
-      if (sortBy === 'state') k = getProjectState(p) || '—';
-      else if (sortBy === 'client_name') k = getClientName(p) || '—';
-      else if (sortBy === 'buyer_company') k = getBuyerCompany(p) || '—';
-      else if (sortBy === 'seller_company') k = getSellerCompany(p) || '—';
+      if (groupKey === 'state') k = getProjectState(p) || '—';
+      else if (groupKey === 'client_name') k = getClientName(p) || '—';
+      else if (groupKey === 'buyer_company') k = getBuyerCompany(p) || '—';
+      else if (groupKey === 'seller_company') k = getSellerCompany(p) || '—';
       if (!keyToIndex.has(k)) {
         keyToIndex.set(k, groups.length);
         groups.push({ key: k, items: [] });
@@ -262,9 +308,147 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
       groups[keyToIndex.get(k)].items.push(p);
     }
     return groups;
-  }, [sortedProjects, sortBy]);
+  }, [sortedProjects, sortBy, groupBy]);
+
+  // Helpers and filtered lists for split tables
+  const getClosingYear = (project) => {
+    try {
+      let cpd = project?.cover_page_data;
+      if (typeof cpd === 'string') { try { cpd = JSON.parse(cpd); } catch (_) { cpd = null; } }
+      const d = cpd?.closingDate || cpd?.closing_date || project?.closing_date || null;
+      if (!d) return '';
+      const dt = new Date(String(d));
+      if (!isNaN(dt.getTime())) return String(dt.getFullYear());
+      const m = String(d).match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+      if (m) return m[1];
+      return '';
+    } catch { return ''; }
+  };
+
+  const projectMatchesSearch = (p, term) => {
+    if (!term) return true;
+    const t = term.toLowerCase();
+    return (
+      String(p.title || '').toLowerCase().includes(t) ||
+      String(p.property_address || '').toLowerCase().includes(t) ||
+      String(p.property_description || '').toLowerCase().includes(t) ||
+      String(p.client_name || '').toLowerCase().includes(t)
+    );
+  };
+
+  const isNeedsPublishing = (p) => {
+    const st = p._publishStatus || {};
+    return !st.hasPublished || !!st.hasPendingChanges;
+  };
+
+  const filteredTop = React.useMemo(() => {
+    let list = projects.filter(isNeedsPublishing);
+    if (localSearchTerm) list = list.filter((p) => projectMatchesSearch(p, localSearchTerm));
+    if (localClientId) list = list.filter((p) => String(p.client_id || '') === String(localClientId));
+    if (localStateFilter) list = list.filter((p) => getProjectState(p) === localStateFilter);
+    if (localYearFilter) list = list.filter((p) => getClosingYear(p) === localYearFilter);
+    return list;
+  }, [projects, localSearchTerm, localClientId, localStateFilter, localYearFilter]);
+
+  const filteredUpToDate = React.useMemo(() => {
+    let list = projects.filter((p) => {
+      const st = p._publishStatus || {};
+      return !!st.hasPublished && !st.hasPendingChanges;
+    });
+    if (upClientId) list = list.filter((p) => String(p.client_id || '') === String(upClientId));
+    if (upState) list = list.filter((p) => getProjectState(p) === upState);
+    if (upYear) list = list.filter((p) => getClosingYear(p) === upYear);
+    return list;
+  }, [projects, upClientId, upState, upYear]);
+
+  const sortProjects = React.useCallback((list) => {
+    const arr = [...list];
+    const dir = sortDir === 'asc' ? 1 : -1;
+    arr.sort((a, b) => {
+      let av, bv;
+      switch (sortBy) {
+        case 'title':
+          av = (a.title || '').toLowerCase();
+          bv = (b.title || '').toLowerCase();
+          return av.localeCompare(bv) * dir;
+        case 'address':
+          av = (a.property_address || '').toLowerCase();
+          bv = (b.property_address || '').toLowerCase();
+          return av.localeCompare(bv) * dir;
+        case 'state':
+          av = getProjectState(a);
+          bv = getProjectState(b);
+          return av.localeCompare(bv) * dir;
+        case 'client_name':
+          av = (a.client_name || '').toLowerCase();
+          bv = (b.client_name || '').toLowerCase();
+          return av.localeCompare(bv) * dir;
+        case 'buyer_company':
+          av = getBuyerCompany(a).toLowerCase();
+          bv = getBuyerCompany(b).toLowerCase();
+          return av.localeCompare(bv) * dir;
+        case 'seller_company':
+          av = getSellerCompany(a).toLowerCase();
+          bv = getSellerCompany(b).toLowerCase();
+          return av.localeCompare(bv) * dir;
+        case 'price':
+          av = getPrice(a) ?? -Infinity;
+          bv = getPrice(b) ?? -Infinity;
+          return (av - bv) * dir;
+        case 'closing_date':
+          av = a.closing_date ? new Date(a.closing_date).getTime() : 0;
+          bv = b.closing_date ? new Date(b.closing_date).getTime() : 0;
+          return (av - bv) * dir;
+        default:
+          return 0;
+      }
+    });
+    return arr;
+  }, [sortBy, sortDir]);
+
+  const sortedTop = React.useMemo(() => sortProjects(filteredTop), [filteredTop, sortProjects]);
+  const sortedUp = React.useMemo(() => sortProjects(filteredUpToDate), [filteredUpToDate, sortProjects]);
+
+  const groupedTop = React.useMemo(() => {
+    if (sortBy !== 'state' && sortBy !== 'client_name' && sortBy !== 'buyer_company' && sortBy !== 'seller_company') return null;
+    const groups = [];
+    const keyToIndex = new Map();
+    for (const p of sortedTop) {
+      let k = '—';
+      if (sortBy === 'state') k = getProjectState(p) || '—';
+      else if (sortBy === 'client_name') k = getClientName(p) || '—';
+      else if (sortBy === 'buyer_company') k = getBuyerCompany(p) || '—';
+      else if (sortBy === 'seller_company') k = getSellerCompany(p) || '—';
+      if (!keyToIndex.has(k)) { keyToIndex.set(k, groups.length); groups.push({ key: k, items: [] }); }
+      groups[keyToIndex.get(k)].items.push(p);
+    }
+    return groups;
+  }, [sortedTop, sortBy]);
+
+  const groupedUp = React.useMemo(() => {
+    if (sortBy !== 'state' && sortBy !== 'client_name' && sortBy !== 'buyer_company' && sortBy !== 'seller_company') return null;
+    const groups = [];
+    const keyToIndex = new Map();
+    for (const p of sortedUp) {
+      let k = '—';
+      if (sortBy === 'state') k = getProjectState(p) || '—';
+      else if (sortBy === 'client_name') k = getClientName(p) || '—';
+      else if (sortBy === 'buyer_company') k = getBuyerCompany(p) || '—';
+      else if (sortBy === 'seller_company') k = getSellerCompany(p) || '—';
+      if (!keyToIndex.has(k)) { keyToIndex.set(k, groups.length); groups.push({ key: k, items: [] }); }
+      groups[keyToIndex.get(k)].items.push(p);
+    }
+    return groups;
+  }, [sortedUp, sortBy]);
+
 
   const toggleSort = (key) => {
+    if (key === 'title') {
+      setGroupBy(null); // single table when sorting by title
+    }
+    if (key === 'client_sync') {
+      setGroupBy('client_sync'); // lock grouping by client sync
+    }
     if (sortBy === key) {
       setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     } else {
@@ -276,13 +460,14 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
   const ColGroup = () => (
     <colgroup>
       <col style={{ width: columnWidths.title }} />
+      <col style={{ width: columnWidths.client_sync || 120 }} />
       <col style={{ width: columnWidths.state }} />
       <col style={{ width: columnWidths.client_name }} />
       <col style={{ width: columnWidths.buyer_company }} />
       <col style={{ width: columnWidths.seller_company }} />
       <col style={{ width: columnWidths.price }} />
       <col style={{ width: columnWidths.closing_date }} />
-      <col style={{ width: columnWidths.actions }} />
+      <col style={{ width: ACTIONS_COL_WIDTH }} />
     </colgroup>
   );
 
@@ -305,20 +490,15 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
     <thead className="bg-gray-50">
       <tr>
         <HeaderCell label="Title" sortKey="title" onSort={toggleSort} />
+        <HeaderCell label="Client Sync" sortKey="client_sync" onSort={toggleSort} />
         <HeaderCell label="State" sortKey="state" onSort={toggleSort} />
         <HeaderCell label="Client" sortKey="client_name" onSort={toggleSort} />
         <HeaderCell label="Buyer Company" sortKey="buyer_company" onSort={toggleSort} />
         <HeaderCell label="Seller Company" sortKey="seller_company" onSort={toggleSort} />
         <HeaderCell label="Purchase Price" sortKey="price" onSort={toggleSort} />
         <HeaderCell label="Closing Date" sortKey="closing_date" onSort={toggleSort} />
-        <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider select-none relative">
+        <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider select-none" style={{ width: ACTIONS_COL_WIDTH }}>
           <span className="pr-2">Actions</span>
-          <span
-            onMouseDown={(e) => startResize(e, 'actions')}
-            className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize bg-transparent hover:bg-gray-300"
-            role="separator"
-            aria-orientation="vertical"
-          />
         </th>
       </tr>
     </thead>
@@ -441,7 +621,7 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Search and Filter Bar */}
+        {/* Search and Filter Bar (applies to Needs Publishing only) */}
         <div className="mb-8 grid grid-cols-1 sm:grid-cols-6 gap-4 items-end">
           <div className="sm:col-span-2">
             <div className="relative">
@@ -460,22 +640,17 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Closing From</label>
-            <input
-              type="date"
+            <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+            <select
               className="block w-full px-3 py-2 border border-gray-300 h-10"
-              value={localFrom}
-              onChange={(e)=>{ const v = e.target.value; setLocalFrom(v); handleSearch(localSearchTerm, v, localTo, localClientId); }}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Closing To</label>
-            <input
-              type="date"
-              className="block w-full px-3 py-2 border border-gray-300 h-10"
-              value={localTo}
-              onChange={(e)=>{ const v = e.target.value; setLocalTo(v); handleSearch(localSearchTerm, localFrom, v, localClientId); }}
-            />
+              value={localYearFilter}
+              onChange={(e)=> setLocalYearFilter(e.target.value)}
+            >
+              <option value="">All years</option>
+              {Array.from(new Set(projects.map(getClosingYear).filter(Boolean))).sort().map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
@@ -492,11 +667,10 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
-            <ClientSelect value={localClientId} onChange={(v)=>{ setLocalClientId(v); handleSearch(localSearchTerm, localFrom, localTo, v); }} />
+            <ClientSelect value={localClientId} onChange={(v)=>{ setLocalClientId(v); }} />
           </div>
-          <div className="flex space-x-3">
-            <Button variant="secondary" onClick={()=>{ setLocalSearchTerm(''); setLocalFrom(''); setLocalTo(''); setLocalClientId(''); setLocalStateFilter(''); handleSearch('', '', '', ''); }} disabled={loading} size="sm">Clear</Button>
-            <Button variant="secondary" onClick={handleRefresh} disabled={loading} size="sm">Refresh</Button>
+          <div className="flex flex-wrap justify-end gap-3">
+            <Button variant="secondary" onClick={()=>{ setLocalSearchTerm(''); setLocalYearFilter(''); setLocalClientId(''); setLocalStateFilter(''); }} disabled={loading} size="sm">Clear</Button>
             <button
               onClick={() => setViewMode((m) => (m === 'cards' ? 'list' : 'cards'))}
               className="px-3 py-1.5 text-sm rounded border border-gray-300 bg-white hover:bg-gray-50 whitespace-nowrap min-w-[110px]"
@@ -587,6 +761,18 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
                         onClick={() => openProject(project)}
                       >
                         <td className="px-4 py-2 text-sm text-gray-900">{project.title || 'Untitled Project'}</td>
+                        <td className="px-4 py-2 text-sm">
+                          {(() => {
+                            const st = project._publishStatus || {};
+                            if (st.hasPublished && st.hasPendingChanges) {
+                              return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">Changes not published</span>;
+                            }
+                            if (st.hasPublished) {
+                              return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Up to date</span>;
+                            }
+                            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">Not published</span>;
+                          })()}
+                        </td>
                         <td className="px-4 py-2 text-sm text-gray-700">{getProjectState(project) || '—'}</td>
                         <td className="px-4 py-2 text-sm text-gray-700">{getClientName(project) || '—'}</td>
                         <td className="px-4 py-2 text-sm text-gray-700">{getBuyerCompany(project) || '—'}</td>
@@ -594,7 +780,19 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
                         <td className="px-4 py-2 text-sm text-gray-700">{getPrice(project) != null ? getPrice(project).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : '—'}</td>
                         <td className="px-4 py-2 text-sm text-gray-700">{project.closing_date ? new Date(project.closing_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
                         <td className="px-4 py-2 text-right whitespace-nowrap">
-                          <Button size="xs" variant="primary" className="rounded" onClick={(e) => { e.stopPropagation(); handleEditProject(project); }}>Edit</Button>
+                          {/* Quick Publish first when applicable */}
+                          {(() => { const st = project._publishStatus || {}; if (!st.hasPublished || st.hasPendingChanges) {
+                            return (
+                              <button
+                                className="px-2 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-700"
+                                onClick={(e) => { e.stopPropagation(); navigate(`/projects/${project.id}`); }}
+                                title="Publish updates to client"
+                              >
+                                Publish
+                              </button>
+                            );
+                          } return null; })()}
+                          <Button size="xs" variant="primary" className="ml-2 rounded" onClick={(e) => { e.stopPropagation(); handleEditProject(project); }}>Edit</Button>
                           <Button
                             size="xs"
                             variant="danger"
@@ -612,46 +810,76 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
               </div>
             )}
 
-            {groupedForList && groupedForList.map((group) => (
-              <div key={group.key} className="overflow-x-auto border border-gray-200 rounded-md">
-                <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-800">
-                  {sortBy === 'state' ? `State: ${group.key}` : sortBy === 'client_name' ? `Client: ${group.key}` : sortBy === 'buyer_company' ? `Buyer Company: ${group.key}` : `Seller Company: ${group.key}`}
-                </div>
-                <table className="min-w-full table-fixed divide-y divide-gray-200">
-                  <ColGroup />
-                  <TableHeader />
-                  <tbody className="bg-white divide-y divide-gray-100">
-                    {group.items.map((project) => (
-                      <tr
-                        key={project.id}
-                        className="hover:bg-gray-50 cursor-pointer"
-                        onClick={() => openProject(project)}
-                      >
-                        <td className="px-4 py-2 text-sm text-gray-900">{project.title || 'Untitled Project'}</td>
-                        <td className="px-4 py-2 text-sm text-gray-700">{getProjectState(project) || '—'}</td>
-                        <td className="px-4 py-2 text-sm text-gray-700">{getClientName(project) || '—'}</td>
-                        <td className="px-4 py-2 text-sm text-gray-700">{getBuyerCompany(project) || '—'}</td>
-                        <td className="px-4 py-2 text-sm text-gray-700">{getSellerCompany(project) || '—'}</td>
-                        <td className="px-4 py-2 text-sm text-gray-700">{getPrice(project) != null ? getPrice(project).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : '—'}</td>
-                        <td className="px-4 py-2 text-sm text-gray-700">{project.closing_date ? new Date(project.closing_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
-                        <td className="px-4 py-2 text-right whitespace-nowrap">
-                          <Button size="xs" variant="primary" className="rounded" onClick={(e) => { e.stopPropagation(); handleEditProject(project); }}>Edit</Button>
-                          <Button
-                            size="xs"
-                            variant="danger"
-                            className="ml-2 rounded"
-                            onClick={(e) => { e.stopPropagation(); openDeleteDialog(project); }}
-                            disabled={actionLoading && selectedProject?.id === project.id}
+            {groupedForList && (
+              <div className="overflow-x-auto">
+                <div className="space-y-6 min-w-full">
+                  {groupedForList.map((group) => (
+                  <div key={group.key} className="border border-gray-200 rounded-md">
+                    <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-800">
+                      {(groupBy || sortBy) === 'state' ? `State: ${group.key}` : (groupBy || sortBy) === 'client_name' ? `Client: ${group.key}` : (groupBy || sortBy) === 'buyer_company' ? `Buyer Company: ${group.key}` : (groupBy || sortBy) === 'client_sync' ? `Client Sync: ${group.key}` : `Seller Company: ${group.key}`}
+                    </div>
+                    <table className="min-w-full table-fixed divide-y divide-gray-200">
+                      <ColGroup />
+                      <TableHeader />
+                      <tbody className="bg-white divide-y divide-gray-100">
+                        {group.items.map((project) => (
+                          <tr
+                            key={project.id}
+                            className="hover:bg-gray-50 cursor-pointer"
+                            onClick={() => openProject(project)}
                           >
-                            Delete
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                            <td className="px-4 py-2 text-sm text-gray-900">{project.title || 'Untitled Project'}</td>
+                            <td className="px-4 py-2 text-sm">
+                              {(() => {
+                                const st = project._publishStatus || {};
+                                if (st.hasPublished && st.hasPendingChanges) {
+                                  return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">Changes not published</span>;
+                                }
+                                if (st.hasPublished) {
+                                  return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Up to date</span>;
+                                }
+                                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">Not published</span>;
+                              })()}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-700">{getProjectState(project) || '—'}</td>
+                            <td className="px-4 py-2 text-sm text-gray-700">{getClientName(project) || '—'}</td>
+                            <td className="px-4 py-2 text-sm text-gray-700">{getBuyerCompany(project) || '—'}</td>
+                            <td className="px-4 py-2 text-sm text-gray-700">{getSellerCompany(project) || '—'}</td>
+                            <td className="px-4 py-2 text-sm text-gray-700">{getPrice(project) != null ? getPrice(project).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : '—'}</td>
+                            <td className="px-4 py-2 text-sm text-gray-700">{project.closing_date ? new Date(project.closing_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
+                            <td className="px-4 py-2 text-right whitespace-nowrap">
+                              {/* Quick Publish first when applicable */}
+                              {(() => { const st = project._publishStatus || {}; if (!st.hasPublished || st.hasPendingChanges) {
+                                return (
+                                  <button
+                                    className="px-2 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-700"
+                                    onClick={(e) => { e.stopPropagation(); navigate(`/projects/${project.id}`); }}
+                                    title="Publish updates to client"
+                                  >
+                                    Publish
+                                  </button>
+                                );
+                              } return null; })()}
+                              <Button size="xs" variant="primary" className="ml-2 rounded" onClick={(e) => { e.stopPropagation(); handleEditProject(project); }}>Edit</Button>
+                              <Button
+                                size="xs"
+                                variant="danger"
+                                className="ml-2 rounded"
+                                onClick={(e) => { e.stopPropagation(); openDeleteDialog(project); }}
+                                disabled={actionLoading && selectedProject?.id === project.id}
+                              >
+                                Delete
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  ))}
+                </div>
               </div>
-            ))}
+            )}
           </div>
         )}
 

@@ -1,6 +1,7 @@
 // src/hooks/useProjects.js
 import { useState, useEffect, useCallback } from 'react';
 import ProjectsService from '../utils/supabaseProjects';
+import { supabase } from '../lib/supabase';
 
 export const useProjects = () => {
   const [projects, setProjects] = useState([]);
@@ -24,7 +25,52 @@ export const useProjects = () => {
         throw result.error;
       }
       
-      setProjects(result.data);
+      let list = result.data || [];
+
+      // Enrich with client publish/sync status
+      try {
+        const projectIds = list.map(p => p.id).filter(Boolean);
+        if (projectIds.length > 0) {
+          // Limit to current user's binders
+          const { data: { user } } = await supabase.auth.getUser();
+          let query = supabase
+            .from('client_binders')
+            .select('project_id, is_published, is_active, published_at, updated_at, id')
+            .in('project_id', projectIds);
+          if (user?.id) query = query.eq('user_id', user.id);
+          const { data: binders } = await query;
+          const byProject = new Map();
+          (binders || []).forEach(b => {
+            if (!b || !b.project_id) return;
+            if (!byProject.has(b.project_id)) byProject.set(b.project_id, []);
+            byProject.get(b.project_id).push(b);
+          });
+          const enriched = list.map(p => {
+            const rows = byProject.get(p.id) || [];
+            const publishedRows = rows.filter(r => r.is_published && r.is_active);
+            const lastPublishedAt = publishedRows.reduce((acc, r) => {
+              const t = r.published_at ? new Date(r.published_at).getTime() : 0;
+              return Math.max(acc, isFinite(t) ? t : 0);
+            }, 0);
+            const hasPublished = publishedRows.length > 0;
+            const projectUpdatedTs = p.updated_at ? new Date(p.updated_at).getTime() : 0;
+            const hasPendingChanges = hasPublished && projectUpdatedTs > lastPublishedAt && lastPublishedAt > 0;
+            return {
+              ...p,
+              _publishStatus: {
+                hasPublished,
+                lastPublishedAt: lastPublishedAt ? new Date(lastPublishedAt).toISOString() : null,
+                hasPendingChanges
+              }
+            };
+          });
+          list = enriched;
+        }
+      } catch (_) {
+        // If anything fails, proceed without status
+      }
+
+      setProjects(list);
     } catch (err) {
       setError(err.message || 'Failed to fetch projects');
       setProjects([]);

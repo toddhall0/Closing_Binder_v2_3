@@ -234,7 +234,17 @@ export class ClientDashboardService {
         .from('client_binders')
         .select(`
           *,
-          projects(title, property_address, cover_photo_url, property_photo_url)
+          projects(
+            title,
+            property_address,
+            buyer,
+            seller,
+            closing_date,
+            purchase_price,
+            cover_photo_url,
+            property_photo_url,
+            cover_page_data
+          )
         `)
         .eq('is_published', true)
         .eq('is_active', true);
@@ -352,7 +362,17 @@ export class ClientDashboardService {
         .from('client_binders')
         .select(`
           *,
-          projects(title, property_address, cover_photo_url, property_photo_url)
+          projects(
+            title,
+            property_address,
+            buyer,
+            seller,
+            closing_date,
+            purchase_price,
+            cover_photo_url,
+            property_photo_url,
+            cover_page_data
+          )
         `)
         // Include binders linked by client_id OR legacy/email-based association
         .or(`client_id.eq.${client.id},client_email.eq.${(client.email || '').toLowerCase()}`)

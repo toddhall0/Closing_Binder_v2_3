@@ -103,9 +103,27 @@ const ClientDashboard = () => {
   // Parties filter removed; ignore filters.parties
 
   const getBinderState = (b) => {
-    const addr = b?.property_address || b?.projects?.property_address || '';
-    const m = String(addr).match(/\b([A-Z]{2})\b/);
-    return m ? m[1] : '';
+    // Match ProjectsDashboard precedence
+    // 1) cover_page_data.propertyState/property_state (prefer project)
+    // 2) projects.property_state
+    // 3) parse from address
+    try {
+      let cpd = b?.projects?.cover_page_data || b?.cover_page_data || null;
+      if (typeof cpd === 'string') {
+        try { cpd = JSON.parse(cpd); } catch(_) { cpd = null; }
+      }
+      if (cpd && typeof cpd === 'object') {
+        const ps1 = (cpd.propertyState || cpd.property_state || '').toString().trim().toUpperCase();
+        if (ps1 && /^[A-Z]{2}$/.test(ps1)) return ps1;
+      }
+      const ps2 = (b?.projects?.property_state || '').toString().trim().toUpperCase();
+      if (ps2 && /^[A-Z]{2}$/.test(ps2)) return ps2;
+      const addr = (b?.projects?.property_address || b?.property_address || '').toString();
+      const m = addr.match(/\b([A-Z]{2})\b/);
+      return m ? m[1] : '';
+    } catch (_) {
+      return '';
+    }
   };
 
   const getBinderClosingDate = (b) => {
@@ -131,12 +149,19 @@ const ClientDashboard = () => {
   };
 
   const getBinderSellerCompany = (b) => {
+    // Strictly use project sources to match Firm Projects table and binder viewer
     try {
-      const c = b?.cover_page_data || {};
-      const sellerFromCover = c?.contact_info?.seller?.company || c?.seller || null;
-      return (sellerFromCover || b?.seller || b?.projects?.seller || '').toString();
+      let projectCover = b?.projects?.cover_page_data || null;
+      if (typeof projectCover === 'string') {
+        try { projectCover = JSON.parse(projectCover); } catch(_) { projectCover = null; }
+      }
+      const fromProjectCover = projectCover?.contact_info?.seller?.company || projectCover?.seller || null;
+      const fromProject = b?.projects?.seller || null;
+      if (fromProjectCover) return String(fromProjectCover);
+      if (fromProject) return String(fromProject);
+      return '';
     } catch (_) {
-      return (b?.seller || b?.projects?.seller || '').toString();
+      return '';
     }
   };
 
