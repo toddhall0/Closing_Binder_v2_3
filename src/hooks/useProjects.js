@@ -31,13 +31,11 @@ export const useProjects = () => {
       try {
         const projectIds = list.map(p => p.id).filter(Boolean);
         if (projectIds.length > 0) {
-          // Limit to current user's binders
-          const { data: { user } } = await supabase.auth.getUser();
+          // Consider all binders for these projects (owner or firm admins)
           let query = supabase
             .from('client_binders')
             .select('project_id, is_published, is_active, published_at, updated_at, id')
             .in('project_id', projectIds);
-          if (user?.id) query = query.eq('user_id', user.id);
           const { data: binders } = await query;
           const byProject = new Map();
           (binders || []).forEach(b => {

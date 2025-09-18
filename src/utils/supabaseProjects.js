@@ -18,10 +18,17 @@ class ProjectsService {
         throw new Error('User not authenticated');
       }
 
+      // Allow firm admins to see projects owned by the firm owner(s) who invited them
+      const { data: memberships } = await supabase
+        .from('firm_users')
+        .select('firm_owner_id')
+        .eq('user_id', user.id);
+      const ownerIds = Array.from(new Set([user.id, ...((memberships || []).map(m => m.firm_owner_id).filter(Boolean))]));
+
       const { data, error } = await supabase
         .from('projects')
         .select('*')
-        .eq('user_id', user.id)
+        .in('user_id', ownerIds)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -53,10 +60,17 @@ class ProjectsService {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) throw new Error('User not authenticated');
 
+      // Allow firm admins to see projects owned by the firm owner(s) who invited them
+      const { data: memberships } = await supabase
+        .from('firm_users')
+        .select('firm_owner_id')
+        .eq('user_id', user.id);
+      const ownerIds = Array.from(new Set([user.id, ...((memberships || []).map(m => m.firm_owner_id).filter(Boolean))]));
+
       let query = supabase
         .from('projects')
         .select('*')
-        .eq('user_id', user.id)
+        .in('user_id', ownerIds)
         .order('created_at', { ascending: false });
 
       if (filters.query && filters.query.trim()) {
@@ -179,11 +193,18 @@ class ProjectsService {
         throw new Error('User not authenticated');
       }
 
+      // Include owner(s) of firm this user administers
+      const { data: memberships } = await supabase
+        .from('firm_users')
+        .select('firm_owner_id')
+        .eq('user_id', user.id);
+      const ownerIds = Array.from(new Set([user.id, ...((memberships || []).map(m => m.firm_owner_id).filter(Boolean))]));
+
       const { data, error } = await supabase
         .from('projects')
         .select('*')
         .eq('id', projectId)
-        .eq('user_id', user.id)
+        .in('user_id', ownerIds)
         .single();
 
       if (error) {
@@ -297,12 +318,19 @@ class ProjectsService {
         throw new Error('No valid fields to update');
       }
 
+      // Determine permissible owner ids for this admin
+      const { data: memberships } = await supabase
+        .from('firm_users')
+        .select('firm_owner_id')
+        .eq('user_id', user.id);
+      const ownerIds = Array.from(new Set([user.id, ...((memberships || []).map(m => m.firm_owner_id).filter(Boolean))]));
+
       const attempt = async (payload) => {
         return supabase
           .from('projects')
           .update(payload)
           .eq('id', projectId)
-          .eq('user_id', user.id)
+          .in('user_id', ownerIds)
           .select()
           .single();
       };
@@ -440,11 +468,18 @@ class ProjectsService {
       }
 
       // Step 7: Finally delete the project itself
+      // Allow delete if project belongs to owner(s) this admin represents
+      const { data: memberships } = await supabase
+        .from('firm_users')
+        .select('firm_owner_id')
+        .eq('user_id', user.id);
+      const ownerIds = Array.from(new Set([user.id, ...((memberships || []).map(m => m.firm_owner_id).filter(Boolean))]));
+
       const { error: projectError } = await supabase
         .from('projects')
         .delete()
         .eq('id', projectId)
-        .eq('user_id', user.id);
+        .in('user_id', ownerIds);
 
       if (projectError) {
         if (projectError.code === 'PGRST116') {
@@ -635,6 +670,12 @@ class ProjectsService {
         throw new Error('User not authenticated');
       }
 
+      const { data: memberships } = await supabase
+        .from('firm_users')
+        .select('firm_owner_id')
+        .eq('user_id', user.id);
+      const ownerIds = Array.from(new Set([user.id, ...((memberships || []).map(m => m.firm_owner_id).filter(Boolean))]));
+
       const { data, error } = await supabase
         .from('projects')
         .select(`
@@ -644,7 +685,7 @@ class ProjectsService {
           logos(*)
         `)
         .eq('id', projectId)
-        .eq('user_id', user.id)
+        .in('user_id', ownerIds)
         .single();
 
       if (error) {

@@ -20,11 +20,16 @@ const Settings = () => {
     setSending(true);
     try {
       const appOrigin = window.location.origin;
+      const { data: userData } = await supabase.auth.getUser();
+      const inviterName = userData?.user?.email || '';
       const { data, error } = await supabase.functions.invoke('send-firm-invite', {
-        body: { toEmail: inviteEmail, appOrigin }
+        body: { toEmail: inviteEmail, appOrigin, inviterName }
       });
-      if (error) throw new Error(error.message || 'Failed to send invite');
-      setInviteSuccess('Invitation sent.');
+      if (error || data?.error) {
+        const message = (data && data.error) || (error && error.message) || 'Failed to send invite';
+        throw new Error(String(message));
+      }
+      setInviteSuccess(`Invitation sent to ${inviteEmail}.`);
       setInviteEmail('');
       await loadInvites();
     } catch (err) {
@@ -56,9 +61,9 @@ const Settings = () => {
       // List firm admins for this owner
       const { data: members } = await supabase
         .from('firm_users')
-        .select('user_id, role, users:auth.users(email)')
+        .select('user_id, role')
         .eq('firm_owner_id', user.id);
-      const list = (members || []).map(m => ({ user_id: m.user_id, role: m.role, email: m.users?.email || '' }));
+      const list = (members || []).map(m => ({ user_id: m.user_id, role: m.role, email: '' }));
       setAdmins(list);
     } finally {
       setLoadingAdmins(false);
@@ -140,25 +145,33 @@ const Settings = () => {
             <section className="border border-gray-200 rounded-lg p-6">
               <h2 className="text-lg font-medium text-gray-900">Invite Firm Admin</h2>
               <p className="mt-1 text-sm text-gray-600">Send an email invite to add a colleague as a firm admin.</p>
-              <form onSubmit={sendFirmInvite} className="mt-4 flex gap-2">
-                <input
-                  type="email"
-                  value={inviteEmail}
-                  onChange={(e)=>setInviteEmail(e.target.value)}
-                  placeholder="admin@firm.com"
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded"
-                  disabled={sending}
-                />
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-black text-white rounded disabled:opacity-50"
-                  disabled={sending}
-                >
-                  {sending ? 'Sending…' : 'Send Invite'}
-                </button>
-              </form>
-              {inviteError && <p className="mt-2 text-sm text-red-600">{inviteError}</p>}
-              {inviteSuccess && <p className="mt-2 text-sm text-green-700">{inviteSuccess}</p>}
+              {!isOwner ? (
+                <div className="mt-4 text-sm text-gray-700">
+                  You must be a firm owner to send admin invites. Create a client (you will be set as owner), then return here to invite admins.
+                </div>
+              ) : (
+                <>
+                  <form onSubmit={sendFirmInvite} className="mt-4 flex gap-2">
+                    <input
+                      type="email"
+                      value={inviteEmail}
+                      onChange={(e)=>setInviteEmail(e.target.value)}
+                      placeholder="admin@firm.com"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded"
+                      disabled={sending}
+                    />
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-black text-white rounded disabled:opacity-50"
+                      disabled={sending}
+                    >
+                      {sending ? 'Sending…' : 'Send Invite'}
+                    </button>
+                  </form>
+                  {inviteError && <p className="mt-2 text-sm text-red-600">{inviteError}</p>}
+                  {inviteSuccess && <p className="mt-2 text-sm text-green-700">{inviteSuccess}</p>}
+                </>
+              )}
             </section>
 
             {isOwner && (

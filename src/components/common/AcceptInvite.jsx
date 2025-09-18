@@ -16,11 +16,14 @@ const AcceptInvite = () => {
         const token = params.get('token');
         if (!type || !token) { setError('Missing invite parameters'); return; }
 
+        const paramsEmail = params.get('email') || '';
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
-          // Ask user to login/signup, then come back
-          const redir = `/login?redirect=${encodeURIComponent(location.pathname + location.search)}`;
-          setRedirect(redir);
+          // Redirect new users to signup prefilled with invite email
+          const base = '/signup';
+          const redirectBack = encodeURIComponent(location.pathname + location.search);
+          const query = `?email=${encodeURIComponent(paramsEmail)}&redirect=${redirectBack}`;
+          setRedirect(base + query);
           return;
         }
 

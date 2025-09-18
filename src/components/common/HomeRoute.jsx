@@ -16,6 +16,19 @@ const HomeRoute = () => {
         return;
       }
       try {
+        // Prefer firm admin access if present
+        const { data: firmAdmin } = await supabase
+          .from('firm_users')
+          .select('user_id')
+          .eq('user_id', user.id)
+          .limit(1)
+          .maybeSingle();
+        if (firmAdmin) {
+          setRedirect('/dashboard');
+          return;
+        }
+
+        // Otherwise, check client access by email
         const email = (user.email || '').toLowerCase();
         const { data: clientMatch } = await supabase
           .from('clients')
@@ -25,15 +38,16 @@ const HomeRoute = () => {
           .maybeSingle();
         if (clientMatch) {
           setRedirect('/client');
-        } else {
-          const { data: invited } = await supabase
-            .from('client_users')
-            .select('id')
-            .eq('email', email)
-            .limit(1)
-            .maybeSingle();
-          setRedirect(invited ? '/client' : '/dashboard');
+          return;
         }
+
+        const { data: invited } = await supabase
+          .from('client_users')
+          .select('id')
+          .eq('email', email)
+          .limit(1)
+          .maybeSingle();
+        setRedirect(invited ? '/client' : '/dashboard');
       } catch {
         setRedirect('/dashboard');
       }

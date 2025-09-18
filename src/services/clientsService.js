@@ -6,10 +6,17 @@ export class ClientsService {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) throw new Error('User not authenticated');
 
+      // Include clients owned by firm owners who invited this user
+      const { data: memberships } = await supabase
+        .from('firm_users')
+        .select('firm_owner_id')
+        .eq('user_id', user.id);
+      const ownerIds = Array.from(new Set([user.id, ...((memberships || []).map(m => m.firm_owner_id).filter(Boolean))]));
+
       let query = supabase
         .from('clients')
         .select('*')
-        .eq('owner_id', user.id)
+        .in('owner_id', ownerIds)
         .order('created_at', { ascending: false });
       if (searchTerm && searchTerm.trim()) {
         const like = `%${searchTerm.trim()}%`;

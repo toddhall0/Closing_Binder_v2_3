@@ -82,76 +82,94 @@ async function sendWithSendGrid(toEmail: string, subject: string, html: string) 
   return { success: true };
 }
 
-function generateToken(): string {
+function generateToken() {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
-  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+  return Array.from(bytes).map((b)=>b.toString(16).padStart(2, "0")).join("");
 }
 
-serve(async (req) => {
+serve(async (req)=>{
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response("ok", {
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json"
+      }
+    });
   }
-
   try {
     const authHeader = req.headers.get("Authorization") || "";
     if (!authHeader) throw new Error("Missing Authorization header");
 
-    const payload = (await req.json()) as InvitePayload;
-    assertString(payload.toEmail, "toEmail");
+    // Be tolerant of missing/invalid JSON and alternate keys
+    let payload: any = {};
+    try {
+      payload = await req.json();
+    } catch (_) {
+      payload = {};
+    }
+    const toEmail: string = (typeof payload.toEmail === 'string' && payload.toEmail.trim())
+      || (typeof payload.email === 'string' && payload.email.trim())
+      || (typeof payload.to === 'string' && payload.to.trim())
+      || '';
+    assertString(toEmail, "toEmail");
 
     const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
+      global: {
+        headers: {
+          Authorization: authHeader
+        }
+      }
     });
     const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
     // Verify requester identity
     const { data: userData, error: userErr } = await anonClient.auth.getUser();
     if (userErr || !userData?.user) throw new Error("Not authenticated");
     const requester = userData.user;
-
     // Ensure requester is a firm owner (has any clients with owner_id == requester.id)
-    const { data: owned } = await serviceClient
-      .from('clients')
-      .select('id')
-      .eq('owner_id', requester.id)
-      .limit(1)
-      .maybeSingle();
+    const { data: owned } = await serviceClient.from('clients').select('id').eq('owner_id', requester.id).limit(1).maybeSingle();
     if (!owned) throw new Error("Only firm owners can send admin invites");
-
     // Create invite
     const token = generateToken();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-    const { error: insErr } = await serviceClient
-      .from('firm_invites')
-      .insert({ firm_owner_id: requester.id, email: payload.toEmail.toLowerCase(), token, expires_at: expiresAt });
+    const { error: insErr } = await serviceClient.from('firm_invites').insert({
+      firm_owner_id: requester.id,
+      email: toEmail.toLowerCase(),
+      token,
+      expires_at: expiresAt
+    });
     if (insErr) throw new Error(insErr.message);
-
-    const appUrl = (payload.appOrigin || '').replace(/\/$/, '') || 'https://app.example.com';
-    const inviteUrl = `${appUrl}/accept-invite?type=firm&token=${encodeURIComponent(token)}`;
-
+    const appUrl = (typeof payload.appOrigin === 'string' ? payload.appOrigin : '').replace(/\/$/, '') || 'https://app.example.com';
+    const inviteUrl = `${appUrl}/accept-invite?type=firm&token=${encodeURIComponent(token)}&email=${encodeURIComponent(toEmail)}`;
     const subject = `${APP_NAME}: Firm Admin Invitation`;
-    const html = buildEmailHtml(inviteUrl, payload.toEmail, payload.inviterName);
-
-    let result: unknown;
+    const html = buildEmailHtml(inviteUrl, toEmail, typeof payload.inviterName === 'string' ? payload.inviterName : undefined);
+    let result;
     if (RESEND_API_KEY) {
-      result = await sendWithResend(payload.toEmail, subject, html);
+      result = await sendWithResend(toEmail, subject, html);
     } else if (SENDGRID_API_KEY) {
-      result = await sendWithSendGrid(payload.toEmail, subject, html);
+      result = await sendWithSendGrid(toEmail, subject, html);
     } else {
       throw new Error("No email provider configured");
     }
-
-    return new Response(JSON.stringify({ ok: true, result }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
+    return new Response(JSON.stringify({
+      ok: true,
+      result
+    }), {
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json"
+      },
+      status: 200
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: String(err?.message || err) }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 400,
+    return new Response(JSON.stringify({
+      error: String(err?.message || err)
+    }), {
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json"
+      },
+      status: 400
     });
   }
 });
-
-
