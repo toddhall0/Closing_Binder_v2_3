@@ -17,7 +17,26 @@ const ClientAccessManagerModal = ({ isOpen, client, onClose }) => {
     try {
       const { data, error } = await ClientsService.listClientUsers(client.id);
       if (error) throw error;
-      setMembers(data);
+      const normalized = (data || []).map((m) => {
+        let first = m.first_name || '';
+        let last = m.last_name || '';
+        let display = m.display_name || '';
+        if ((!first || !last) && !display) {
+          const handle = String(m.email || '').split('@')[0];
+          const guess = handle.replace(/[._-]+/g, ' ').trim();
+          const parts = guess.split(/\s+/);
+          if (!first && parts[0]) first = parts[0].slice(0,1).toUpperCase() + parts[0].slice(1);
+          if (!last && parts.length > 1) {
+            const tail = parts.slice(1).join(' ');
+            last = tail.slice(0,1).toUpperCase() + tail.slice(1);
+          }
+        }
+        if (!display && (first || last)) {
+          display = [first, last].filter(Boolean).join(' ').trim();
+        }
+        return { ...m, first_name: first, last_name: last, display_name: display };
+      });
+      setMembers(normalized);
     } catch (e) {
       setError(e.message || 'Failed to load access list');
     } finally {
@@ -104,28 +123,49 @@ const ClientAccessManagerModal = ({ isOpen, client, onClose }) => {
 
         <div className="border border-gray-200 rounded">
           <div className="px-3 py-2 bg-gray-50 text-sm font-medium text-gray-700">Authorized Users</div>
-          <div className="divide-y divide-gray-200">
-            {loading ? (
-              <div className="px-3 py-3 text-sm text-gray-600">Loading…</div>
-            ) : members.length === 0 ? (
-              <div className="px-3 py-3 text-sm text-gray-600">No users invited yet.</div>
-            ) : (
-              members.map((m) => (
-                <div key={m.id} className="px-3 py-2 flex items-center justify-between">
-                  <div>
-                    <div className="text-sm text-gray-900">{m.email}</div>
-                    <div className="text-xs text-gray-500">Role: {m.role}</div>
-                  </div>
-                  <button
-                    onClick={() => handleRemove(m.id)}
-                    className="px-2 py-1 text-xs text-red-600 border border-red-200 rounded hover:bg-red-50"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
+          {loading ? (
+            <div className="px-3 py-3 text-sm text-gray-600">Loading…</div>
+          ) : members.length === 0 ? (
+            <div className="px-3 py-3 text-sm text-gray-600">No users invited yet.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full table-fixed divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Display Name</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Email</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Role</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-100">
+                  {members.map((m) => (
+                    <tr key={m.id}>
+                      <td className="px-3 py-2 text-sm text-gray-900">{m.display_name || [m.first_name, m.last_name].filter(Boolean).join(' ') || '—'}</td>
+                      <td className="px-3 py-2 text-sm text-gray-900">{m.email}</td>
+                      <td className="px-3 py-2 text-sm text-gray-700">{m.role}</td>
+                      <td className="px-3 py-2 text-sm">
+                        {m.accepted_at ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">accepted</span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">pending</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right whitespace-nowrap">
+                        <button
+                          onClick={() => handleRemove(m.id)}
+                          className="px-2 py-1 text-xs text-red-600 border border-red-200 rounded hover:bg-red-50"
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         <div className="text-xs text-gray-500">

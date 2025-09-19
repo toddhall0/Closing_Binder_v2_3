@@ -13,7 +13,7 @@ const Login = () => {
     const determinePostLoginRoute = async () => {
       if (!loading && user) {
         try {
-          // Honor explicit redirect query param if present
+          // Honor explicit redirect query param if present (and optional email/acct hints)
           const searchParams = new URLSearchParams(location.search);
           const requested = searchParams.get('redirect');
           if (requested && requested.startsWith('/')) {
@@ -51,9 +51,7 @@ const Login = () => {
     return <Navigate to={redirectTo} replace />;
   }
 
-  const handleLoginSuccess = () => {
-    // Navigation will happen automatically via the auth context
-  };
+  const handleLoginSuccess = () => {};
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">

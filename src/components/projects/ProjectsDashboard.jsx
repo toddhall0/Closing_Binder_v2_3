@@ -784,7 +784,8 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
                           {(() => { const st = project._publishStatus || {}; if (!st.hasPublished || st.hasPendingChanges) {
                             return (
                               <button
-                                className="px-2 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-700"
+                                className="px-2 py-1 rounded text-xs opacity-100 focus:outline-none focus:ring-0"
+                                style={{ backgroundColor: '#4CAF50', color: '#fff' }}
                                 onClick={(e) => { e.stopPropagation(); navigate(`/projects/${project.id}`); }}
                                 title="Publish updates to client"
                               >
@@ -792,11 +793,12 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
                               </button>
                             );
                           } return null; })()}
-                          <Button size="xs" variant="primary" className="ml-2 rounded" onClick={(e) => { e.stopPropagation(); handleEditProject(project); }}>Edit</Button>
+                          <Button size="xs" variant="primary" className="ml-2 rounded opacity-100" style={{ backgroundColor: '#424242', color: '#fff' }} onClick={(e) => { e.stopPropagation(); handleEditProject(project); }}>Edit</Button>
                           <Button
                             size="xs"
                             variant="danger"
-                            className="ml-2 rounded"
+                            className="ml-2 rounded opacity-100"
+                            style={{ backgroundColor: '#F44336', color: '#fff' }}
                             onClick={(e) => { e.stopPropagation(); openDeleteDialog(project); }}
                             disabled={actionLoading && selectedProject?.id === project.id}
                           >
@@ -852,7 +854,8 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
                               {(() => { const st = project._publishStatus || {}; if (!st.hasPublished || st.hasPendingChanges) {
                                 return (
                                   <button
-                                    className="px-2 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-700"
+                                    className="px-2 py-1 rounded text-xs opacity-100 focus:outline-none focus:ring-0"
+                                    style={{ backgroundColor: '#4CAF50', color: '#fff' }}
                                     onClick={(e) => { e.stopPropagation(); navigate(`/projects/${project.id}`); }}
                                     title="Publish updates to client"
                                   >
@@ -860,11 +863,12 @@ export const ProjectsDashboard = ({ onProjectSelect }) => {
                                   </button>
                                 );
                               } return null; })()}
-                              <Button size="xs" variant="primary" className="ml-2 rounded" onClick={(e) => { e.stopPropagation(); handleEditProject(project); }}>Edit</Button>
+                              <Button size="xs" variant="primary" className="ml-2 rounded opacity-100" style={{ backgroundColor: '#424242', color: '#fff' }} onClick={(e) => { e.stopPropagation(); handleEditProject(project); }}>Edit</Button>
                               <Button
                                 size="xs"
                                 variant="danger"
-                                className="ml-2 rounded"
+                                className="ml-2 rounded opacity-100"
+                                style={{ backgroundColor: '#F44336', color: '#fff' }}
                                 onClick={(e) => { e.stopPropagation(); openDeleteDialog(project); }}
                                 disabled={actionLoading && selectedProject?.id === project.id}
                               >

@@ -36,17 +36,9 @@ export const AuthProvider = ({ children }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state change:', event, session?.user?.email);
-        
-        // Only update state for confirmed users or when signing out
-        if (event === 'SIGNED_OUT' || (session?.user && session.user.email_confirmed_at)) {
-          setSession(session);
-          setUser(session?.user ?? null);
-        } else if (event === 'SIGNED_UP' && session?.user && !session.user.email_confirmed_at) {
-          // User signed up but hasn't confirmed email - don't auto-login
-          console.log('User signed up, waiting for email confirmation');
-          setSession(null);
-          setUser(null);
-        }
+        // Allow immediate app access after signup/login (no email confirmation gate)
+        setSession(session);
+        setUser(session?.user ?? null);
         setLoading(false);
       }
     );

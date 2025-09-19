@@ -121,31 +121,9 @@ const ClientCoverPage = ({ binder, logos, onNavigateToTOC, documents = [] }) => 
   const closingDate = formatClosingDate(cpd?.closingDate || binder?.closing_date || proj?.closing_date);
 
   return (
-    <div className="max-w-4xl mx-auto bg-white cover-page-container" style={{ minHeight: '11in' }}>
-      {/* Navigation (centered table with two cells) */}
-      <div className="p-6 pt-6 pb-2 flex justify-center">
-        <table className="table-fixed w-[420px]">
-          <tbody>
-            <tr>
-              <td className="w-1/2 pr-8 text-right"></td>
-              <td className="w-1/2 pl-8 text-left">
-                <button
-                  onClick={onNavigateToTOC}
-                  className="text-sm text-gray-600 hover:text-black transition-colors duration-200 font-medium flex items-center"
-                >
-                  Table of Contents
-                  <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      {/* Download (kept separate from navigation) */}
-      <div className="px-6 pb-2 flex justify-end">
+    <div className="max-w-4xl mx-auto bg-white cover-page-container relative" style={{ minHeight: '11in' }}>
+      {/* Only Download button in top-right corner of white area */}
+      <div className="absolute top-4 right-6">
         <button
           onClick={() => setShowDownloadModal(true)}
           className="text-sm text-gray-600 hover:text-black transition-colors duration-200 font-medium flex items-center"

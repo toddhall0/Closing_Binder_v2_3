@@ -31,12 +31,28 @@ function assertString(value: unknown, name: string): asserts value is string {
   }
 }
 
-function buildEmailHtml(payload: InvitePayload): string {
+function generateToken(length = 24): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  let out = '';
+  const cryptoObj = (globalThis as any).crypto || (globalThis as any).webkitCrypto;
+  if (cryptoObj?.getRandomValues) {
+    const bytes = new Uint8Array(length);
+    cryptoObj.getRandomValues(bytes);
+    for (let i = 0; i < length; i++) out += alphabet[bytes[i] % alphabet.length];
+    return out;
+  }
+  for (let i = 0; i < length; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return out;
+}
+
+function buildEmailHtml(payload: InvitePayload, inviteToken: string): string {
   const appUrl = (payload.appOrigin || "").replace(/\/$/, "");
   const clientUrl = payload.clientSlug ? `${appUrl}/client/${payload.clientSlug}` : `${appUrl}/client`;
   // Include redirect to client dashboard after auth
-  const loginUrl = `${appUrl}/login?redirect=${encodeURIComponent(payload.clientSlug ? `/client/${payload.clientSlug}` : '/client')}`;
-  const signupUrl = `${appUrl}/signup?redirect=${encodeURIComponent(payload.clientSlug ? `/client/${payload.clientSlug}` : '/client')}`;
+  const redirectPath = payload.clientSlug ? `/client/${payload.clientSlug}` : '/client';
+  const qp = `redirect=${encodeURIComponent(redirectPath)}&email=${encodeURIComponent(payload.toEmail)}&acct=client&mode=signup&invite=${encodeURIComponent(inviteToken)}`;
+  const loginUrl = `${appUrl}/login${appUrl ? `?${qp}` : ''}`;
+  const signupUrl = `${appUrl}/signup${appUrl ? `?${qp}` : ''}`;
   const inviter = payload.inviterName && payload.inviterName.trim().length > 0 ? payload.inviterName : "A firm member";
   const clientLabel = payload.clientName ? ` for <strong>${payload.clientName}</strong>` : "";
 
@@ -55,6 +71,12 @@ function buildEmailHtml(payload: InvitePayload): string {
       <li><a href="${signupUrl}" style="color:#111111;">Create account</a></li>
       <li><a href="${loginUrl}" style="color:#111111;">Sign in</a></li>
     </ul>
+
+    <div style="margin:18px 0 0 0; padding:12px 14px; background:#F9FAFB; border:1px solid #E5E7EB; border-radius:8px;">
+      <p style="margin:0 0 6px 0; font-size:14px; color:#111827;"><strong>Your Invitation Code</strong></p>
+      <code style="display:inline-block; padding:6px 8px; background:#111111; color:#ffffff; border-radius:6px; font-weight:600; letter-spacing:0.5px;">${inviteToken}</code>
+      <p style="margin:8px 0 0 0; font-size:12px; color:#6b7280;">On the signup page, paste this code into the “Invitation Code or Email” field. You can also paste your email address instead.</p>
+    </div>
 
     <p style="margin:24px 0 0 0; font-size:12px; color:#6b7280;">If you did not expect this invitation, you can ignore this email.</p>
   </div>`;
@@ -110,20 +132,21 @@ serve(async (req) => {
   try {
     const payload = (await req.json()) as InvitePayload;
     assertString(payload.toEmail, "toEmail");
+    const inviteToken = generateToken(20);
 
     const subject = `${APP_NAME}: Client Dashboard Invitation`;
-    const html = buildEmailHtml(payload);
+    const html = buildEmailHtml(payload, inviteToken);
 
     if (RESEND_API_KEY) {
       const result = await sendWithResend(payload.toEmail, subject, html);
-      return new Response(JSON.stringify({ provider: "resend", result }), {
+      return new Response(JSON.stringify({ provider: "resend", result, inviteToken }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
     }
     if (SENDGRID_API_KEY) {
       const result = await sendWithSendGrid(payload.toEmail, subject, html);
-      return new Response(JSON.stringify({ provider: "sendgrid", result }), {
+      return new Response(JSON.stringify({ provider: "sendgrid", result, inviteToken }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });

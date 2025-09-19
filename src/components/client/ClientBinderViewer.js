@@ -164,20 +164,6 @@ const ClientBinderViewer = () => {
     };
     return (
       <div className="max-w-4xl mx-auto bg-white p-6">
-        <div className="mb-4 flex justify-center">
-          <table className="table-fixed w-[420px]">
-            <tbody>
-              <tr>
-                <td className="w-1/2 pr-8 text-right">
-                  <button onClick={() => setCurrentView('toc')} className="text-sm text-blue-600 hover:text-blue-800 underline">
-                    <span className="mr-1">&lt;</span>Back to Table of Contents
-                  </button>
-                </td>
-                <td className="w-1/2 pl-8 text-left"></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
         <div className="text-center mb-6" />
         <div className="space-y-6">
           {/* Row 1: Buyer | Seller */}
@@ -328,6 +314,7 @@ const ClientBinderViewer = () => {
           // no-op; React state handler below
         });
       `}} />
+
       {currentView === 'cover' ? (
         <ClientCoverPage
           binder={binder}

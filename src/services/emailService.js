@@ -12,7 +12,8 @@ export const EmailService = {
         clientName,
         clientSlug,
         inviterName,
-        appOrigin: appOrigin || (typeof window !== 'undefined' ? window.location.origin : ''),
+        // Prefer explicit origin; else use configured public app origin; else window origin
+        appOrigin: appOrigin || process.env.REACT_APP_APP_ORIGIN || (typeof window !== 'undefined' ? window.location.origin : ''),
       };
       const { data, error } = await supabase.functions.invoke('send-client-invite', {
         body: payload,

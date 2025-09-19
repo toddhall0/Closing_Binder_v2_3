@@ -3,7 +3,7 @@ import useClientBinders from '../../hooks/useClientBinders';
 import { ClientBinderCard } from './ClientBinderCard';
 import { Button } from '../common/ui/Button';
 import { LoadingSpinner } from '../common/ui/LoadingSpinner';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { ClientDashboardService } from '../../services/clientDashboardService';
 import { supabase } from '../../lib/supabase';
@@ -11,6 +11,15 @@ import { supabase } from '../../lib/supabase';
 const ClientDashboard = () => {
   const navigate = useNavigate();
   const { slug } = useParams();
+  const location = useLocation();
+  const asFirm = React.useMemo(() => {
+    try {
+      const sp = new URLSearchParams(location.search);
+      return sp.get('as') === 'firm';
+    } catch {
+      return false;
+    }
+  }, [location.search]);
   const { user } = useAuth();
   const [client, setClient] = React.useState(null);
   const { binders, loading, error, filters, updateFilters, clearFilters, refresh } = useClientBinders(slug);
@@ -372,7 +381,16 @@ const ClientDashboard = () => {
                   </>
                 )}
               </div>
-              <div className="flex-none overflow-hidden m-0 p-0">
+              <div className="flex items-start gap-3">
+                {asFirm && (
+                  <button
+                    onClick={() => navigate(-1)}
+                    className="px-3 py-1.5 rounded bg-gray-200 text-gray-900 text-xs border border-gray-300 hover:bg-gray-300"
+                  >
+                    Return to Firm Dashboard
+                  </button>
+                )}
+                <div className="flex-none overflow-hidden m-0 p-0">
                 {firmLogoUrl ? (
                   <img src={firmLogoUrl} alt="Firm Logo" className="block h-auto w-auto max-h-[150px] max-w-[400px] object-contain m-0 p-0" />
                 ) : (
@@ -403,6 +421,7 @@ const ClientDashboard = () => {
                     );
                   })()
                 )}
+                </div>
               </div>
             </div>
           </div>

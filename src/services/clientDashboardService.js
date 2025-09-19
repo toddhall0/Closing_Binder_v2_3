@@ -253,8 +253,7 @@ export class ClientDashboardService {
       const orFilters = [];
       if (emailLower) orFilters.push(`client_email.eq.${emailLower}`);
       if (memberClientIds.length > 0) orFilters.push(`client_id.in.(${memberClientIds.join(',')})`);
-      // Fallback for legacy publisher view (should be filtered by route role, but harmless if no match)
-      orFilters.push(`user_id.eq.${user.id}`);
+      // Do NOT include publisher fallback here; client route must only see their assigned binders
       if (orFilters.length > 0) {
         query = query.or(orFilters.join(','));
       }

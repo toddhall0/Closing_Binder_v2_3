@@ -132,7 +132,7 @@ export class ClientsService {
     }
   }
 
-  static async inviteClientUser(clientId, email, role = 'viewer') {
+  static async inviteClientUser(clientId, email, role = 'viewer', displayName) {
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) throw new Error('User not authenticated');
@@ -142,9 +142,46 @@ export class ClientsService {
         .select('*')
         .single();
       if (error) throw error;
+      // Best-effort: attach a display/name field if the column exists
+      if (data?.id && displayName && String(displayName).trim().length > 0) {
+        try {
+          await supabase
+            .from('client_users')
+            .update({ display_name: String(displayName).trim() })
+            .eq('id', data.id);
+        } catch (_) {}
+      }
       return { data, error: null };
     } catch (error) {
       return { data: null, error };
+    }
+  }
+
+  // Mark acceptance for the current authenticated user across all invited client records.
+  static async acceptInvitesForCurrentUser() {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) return { success: false, error: userError };
+      const emailLower = (user.email || '').toLowerCase();
+      const fullName = (user.user_metadata?.full_name) 
+        || [user.user_metadata?.first_name, user.user_metadata?.last_name].filter(Boolean).join(' ').trim()
+        || '';
+      const updates = { accepted_at: new Date().toISOString(), user_id: user.id };
+      if (fullName) updates.display_name = fullName;
+      // Also store parts if columns exist
+      const first = (user.user_metadata?.first_name || '').toString().trim();
+      const last = (user.user_metadata?.last_name || '').toString().trim();
+      if (first) updates.first_name = first;
+      if (last) updates.last_name = last;
+      try {
+        await supabase
+          .from('client_users')
+          .update(updates)
+          .eq('email', emailLower);
+      } catch (_) {}
+      return { success: true, error: null };
+    } catch (error) {
+      return { success: false, error };
     }
   }
 

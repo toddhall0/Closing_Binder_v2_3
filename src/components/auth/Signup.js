@@ -13,7 +13,7 @@ const Signup = () => {
     const determinePostSignupRoute = async () => {
       if (!loading && user) {
         try {
-          // Honor redirect if provided
+          // Honor redirect if provided (with email/acct hints)
           const searchParams = new URLSearchParams(location.search);
           const requested = searchParams.get('redirect');
           if (requested && requested.startsWith('/')) {

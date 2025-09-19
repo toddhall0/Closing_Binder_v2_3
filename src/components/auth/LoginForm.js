@@ -4,8 +4,10 @@ import { validateEmail } from '../../utils/validation';
 import LoadingSpinner from '../common/LoadingSpinner';
 
 const LoginForm = ({ onToggleForm, onClose }) => {
+  const urlParams = (() => { try { return new URLSearchParams(window.location.search); } catch { return new URLSearchParams(''); } })();
+  const prefillEmail = urlParams.get('email') || '';
   const [formData, setFormData] = useState({
-    email: '',
+    email: prefillEmail,
     password: ''
   });
   const [errors, setErrors] = useState({});

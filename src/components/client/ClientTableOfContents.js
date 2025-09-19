@@ -168,35 +168,8 @@ const ClientTableOfContents = ({
 
   return (
     <div className="max-w-4xl mx-auto bg-white p-6">
-      {/* Header area without left title */}
       <div className="mb-8">
-        {onNavigateToCover && (
-          <div className="mb-4 flex justify-center">
-            <table className="table-fixed w-[420px]">
-              <tbody>
-                <tr>
-                  <td className="w-1/2 pr-8 text-right">
-                    <button
-                      onClick={onNavigateToCover}
-                      className="text-sm text-blue-600 hover:text-blue-800 underline"
-                    >
-                      <span className="mr-1">&lt;</span>Back to Cover Page
-                    </button>
-                  </td>
-                  <td className="w-1/2 pl-8 text-left">
-                    <button
-                      onClick={() => (typeof window !== 'undefined') && window.dispatchEvent(new CustomEvent('navigate-client-contact'))}
-                      className="text-sm text-blue-600 hover:text-blue-800 underline"
-                    >
-                      Contact Information<span className="ml-1">&gt;</span>
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
-        {/* Title removed per request */}
+        {/* No corner/top nav links per request */}
         
         {/* Project Title */}
         {binder?.title && (

@@ -16,38 +16,48 @@ const HomeRoute = () => {
         return;
       }
       try {
-        // Prefer firm admin access if present
-        const { data: firmAdmin } = await supabase
-          .from('firm_users')
-          .select('user_id')
-          .eq('user_id', user.id)
-          .limit(1)
-          .maybeSingle();
-        if (firmAdmin) {
+        // Copy auth display name into client_users on login (non-blocking)
+        try {
+          const base = process.env.REACT_APP_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+          if (base) {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.access_token) {
+              const resp = await fetch(`${base}/functions/v1/accept-client-invite`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${session.access_token}`,
+                  'apikey': process.env.REACT_APP_SUPABASE_ANON_KEY || ''
+                },
+                body: JSON.stringify({})
+              });
+              // Log non-200 to console to aid debugging
+              if (!resp.ok) {
+                try { console.warn('accept-client-invite failed', await resp.text()); } catch {}
+              }
+            }
+          }
+        } catch {}
+
+        // Firm takes precedence: owner of any client, firm_users membership, or metadata flag
+        const [{ data: anyOwnedClient }, { data: firmMember }] = await Promise.all([
+          supabase.from('clients').select('id').eq('owner_id', user.id).limit(1).maybeSingle(),
+          supabase.from('firm_users').select('user_id').eq('user_id', user.id).limit(1).maybeSingle()
+        ]);
+        const isFirmByMetadata = String(user?.user_metadata?.role || '').toLowerCase() === 'firm' 
+          || user?.user_metadata?.is_firm_owner === true;
+        if (anyOwnedClient || firmMember || isFirmByMetadata) {
           setRedirect('/dashboard');
           return;
         }
 
-        // Otherwise, check client access by email
+        // Otherwise client access
         const email = (user.email || '').toLowerCase();
-        const { data: clientMatch } = await supabase
-          .from('clients')
-          .select('id')
-          .eq('email', email)
-          .limit(1)
-          .maybeSingle();
-        if (clientMatch) {
-          setRedirect('/client');
-          return;
-        }
-
-        const { data: invited } = await supabase
-          .from('client_users')
-          .select('id')
-          .eq('email', email)
-          .limit(1)
-          .maybeSingle();
-        setRedirect(invited ? '/client' : '/dashboard');
+        const [{ data: clientMatch }, { data: invited }] = await Promise.all([
+          supabase.from('clients').select('id').eq('email', email).limit(1).maybeSingle(),
+          supabase.from('client_users').select('id').eq('email', email).limit(1).maybeSingle()
+        ]);
+        setRedirect(clientMatch || invited ? '/client' : '/dashboard');
       } catch {
         setRedirect('/dashboard');
       }

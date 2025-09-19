@@ -4,6 +4,7 @@ import ClientsService from '../../services/clientsService';
 import { Button } from './Button';
 import CreateClientModal from './CreateClientModal';
 import EditClientModal from './EditClientModal';
+import ClientAccessManagerModal from './ClientAccessManagerModal';
 
 const ClientsDashboard = () => {
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ const ClientsDashboard = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [activeClient, setActiveClient] = useState(null);
+  const [usersOpen, setUsersOpen] = useState(false);
   const [sortBy, setSortBy] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
 
@@ -165,6 +167,11 @@ const ClientsDashboard = () => {
           onClose={() => setEditOpen(false)}
           onSaved={() => loadClients()}
         />
+        <ClientAccessManagerModal
+          isOpen={usersOpen}
+          client={activeClient}
+          onClose={() => setUsersOpen(false)}
+        />
 
         {error && (
           <div className="mb-4 bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800">{error}</div>
@@ -181,7 +188,7 @@ const ClientsDashboard = () => {
                 <col style={{ width: 240 }} />
                 <col style={{ width: 240 }} />
                 <col style={{ width: 200 }} />
-                <col style={{ width: 160 }} />
+                <col style={{ width: 220 }} />
                 <col style={{ width: 1 }} />
               </colgroup>
               <thead className="bg-gray-50">
@@ -202,6 +209,7 @@ const ClientsDashboard = () => {
                     <td className="px-4 py-2 text-sm text-gray-700">{formatPhoneNumber(getRepPhone(c)) || '—'}</td>
                     <td className="px-2 py-2 text-sm text-gray-700 whitespace-nowrap">
                       <Button size="xs" variant="primary" className="rounded" onClick={(e) => { e.stopPropagation(); setActiveClient(c); setEditOpen(true); }}>Edit</Button>
+                      <Button size="xs" className="ml-2 rounded" onClick={(e) => { e.stopPropagation(); setActiveClient(c); setUsersOpen(true); }}>Users</Button>
                       <Button
                         size="xs"
                         variant="danger"

@@ -13,8 +13,14 @@ const SignupForm = ({ onToggleForm, onClose }) => {
     lastName: ''
   });
   const [errors, setErrors] = useState({});
-  const [accountType, setAccountType] = useState('client'); // 'firm' | 'client'
-  const [inviteCode, setInviteCode] = useState('');
+  const urlParams = (() => {
+    try { return new URLSearchParams(window.location.search); } catch { return new URLSearchParams(''); }
+  })();
+  const initialAcct = urlParams.get('acct') === 'firm' ? 'firm' : 'client';
+  const initialEmail = urlParams.get('email') || '';
+  const initialInvite = urlParams.get('invite') || initialEmail; // accept email as invite hint
+  const [accountType, setAccountType] = useState(initialAcct); // 'firm' | 'client'
+  const [inviteCode, setInviteCode] = useState(initialInvite);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -127,6 +133,31 @@ const SignupForm = ({ onToggleForm, onClose }) => {
     }
     setIsResending(false);
   };
+
+  // After signup success, mark acceptance for any client invites tied to this email
+  React.useEffect(() => {
+    if (!signupSuccess) return;
+    (async () => {
+      try {
+        const base = process.env.REACT_APP_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const token = (window.__supabase_session_token && typeof window.__supabase_session_token === 'string') ? window.__supabase_session_token : null;
+        // Call edge function to mark acceptance (no-op if already accepted)
+        const { supabase } = await import('../../lib/supabase');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token && base) {
+          await fetch(`${base}/functions/v1/accept-client-invite`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+              'apikey': process.env.REACT_APP_SUPABASE_ANON_KEY || ''
+            },
+            body: JSON.stringify({})
+          });
+        }
+      } catch (_) {}
+    })();
+  }, [signupSuccess]);
 
   // Show success screen if signup was successful
   if (signupSuccess) {

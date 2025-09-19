@@ -23,53 +23,55 @@ const ProtectedRoute = ({ children, fallback, allowedRoles }) => {
       }
       try {
         const email = (user.email || '').toLowerCase();
-        // Check direct client record
+
+        // 1) Firm role takes precedence
+        const { data: anyOwnedClient } = await supabase
+          .from('clients')
+          .select('id')
+          .eq('owner_id', user.id)
+          .limit(1)
+          .maybeSingle();
+
+        const isFirmByMetadata = String(user?.user_metadata?.role || '').toLowerCase() === 'firm' 
+          || user?.user_metadata?.is_firm_owner === true;
+
+        const { data: firmMember } = await supabase
+          .from('firm_users')
+          .select('firm_owner_id')
+          .eq('user_id', user.id)
+          .limit(1)
+          .maybeSingle();
+
+        if (anyOwnedClient || isFirmByMetadata || firmMember) {
+          setRole('firm');
+          return;
+        }
+
+        // 2) Client role (direct client record or invited via client_users)
         const { data: clientMatch } = await supabase
           .from('clients')
           .select('id')
           .eq('email', email)
           .limit(1)
           .maybeSingle();
-
         if (clientMatch) {
           setRole('client');
-        } else {
-          // Also treat entries in client_users as client role
-          const { data: invited } = await supabase
-            .from('client_users')
-            .select('id')
-            .eq('email', email)
-            .limit(1)
-            .maybeSingle();
-          if (invited) {
-            setRole('client');
-          } else {
-            // Determine firm role via ownership (has clients) or explicit metadata
-            const { data: anyOwnedClient } = await supabase
-              .from('clients')
-              .select('id')
-              .eq('owner_id', user.id)
-              .limit(1)
-              .maybeSingle();
-
-            const isFirmByMetadata = String(user?.user_metadata?.role || '').toLowerCase() === 'firm' 
-              || user?.user_metadata?.is_firm_owner === true;
-
-            // Membership via firm_users
-            const { data: firmMember } = await supabase
-              .from('firm_users')
-              .select('firm_owner_id')
-              .eq('user_id', user.id)
-              .limit(1)
-              .maybeSingle();
-
-            if (anyOwnedClient || isFirmByMetadata || firmMember) {
-              setRole('firm');
-            } else {
-              setRole('guest');
-            }
-          }
+          return;
         }
+
+        const { data: invited } = await supabase
+          .from('client_users')
+          .select('id')
+          .eq('email', email)
+          .limit(1)
+          .maybeSingle();
+        if (invited) {
+          setRole('client');
+          return;
+        }
+
+        // 3) Guest by default
+        setRole('guest');
       } catch (e) {
         // On error, err on the side of no firm access
         setRole('guest');
