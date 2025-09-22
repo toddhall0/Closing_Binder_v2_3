@@ -37,15 +37,28 @@ function assertString(value: unknown, name: string): asserts value is string {
   }
 }
 
-function buildEmailHtml(inviteUrl: string, toEmail: string, inviterName?: string): string {
+function buildEmailHtml(inviteUrl: string, codeUrl: string, inviteCode: string, toEmail: string, inviterName?: string): string {
   const inviter = inviterName && inviterName.trim().length > 0 ? inviterName : "A firm member";
   return `
   <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color:#111827;">
     <h1 style="font-size:20px; margin:0 0 12px 0;">You've been invited as a Firm Admin</h1>
     <p style="margin:0 0 12px 0;">${inviter} invited you to join ${APP_NAME} as a firm admin.</p>
     <p style="margin:0 0 12px 0;">Use your email <strong>${toEmail}</strong> to sign in.</p>
+    <h2 style="font-size:16px; margin:16px 0 8px 0;">Quick instructions</h2>
+    <ol style="margin:0 0 12px 20px; padding:0;">
+      <li style="margin:4px 0;">Click the button below to open the app.</li>
+      <li style="margin:4px 0;">Create your profile (name, password, etc.).</li>
+      <li style="margin:4px 0;">When asked for an invite code, paste the code shown below.</li>
+    </ol>
     <div style="margin:20px 0;">
       <a href="${inviteUrl}" style="display:inline-block; padding:10px 14px; background:#111111; color:#ffffff; text-decoration:none; border-radius:8px;">Accept Invitation</a>
+    </div>
+    <div style="margin:16px 0 0 0;">
+      <p style="margin:0 0 8px 0;">Your invite code:</p>
+      <a href="${codeUrl}" style="text-decoration:none; color:#111827;">
+        <span style="display:inline-block; padding:10px 12px; border:1px solid #e5e7eb; border-radius:6px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace; background:#f9fafb;">${inviteCode}</span>
+      </a>
+      <p style="margin:8px 0 0 0; font-size:12px; color:#6b7280;">Tip: Click the code to automatically copy it and open the app with the code pre-filled.</p>
     </div>
     <p style="margin:24px 0 0 0; font-size:12px; color:#6b7280;">If you did not expect this invitation, you can ignore this email.</p>
   </div>`;
@@ -141,8 +154,9 @@ serve(async (req)=>{
     if (insErr) throw new Error(insErr.message);
     const appUrl = (typeof payload.appOrigin === 'string' ? payload.appOrigin : '').replace(/\/$/, '') || 'https://app.example.com';
     const inviteUrl = `${appUrl}/accept-invite?type=firm&token=${encodeURIComponent(token)}&email=${encodeURIComponent(toEmail)}`;
+    const codeUrl = `${appUrl}/accept-invite?copy=${encodeURIComponent(token)}&email=${encodeURIComponent(toEmail)}`;
     const subject = `${APP_NAME}: Firm Admin Invitation`;
-    const html = buildEmailHtml(inviteUrl, toEmail, typeof payload.inviterName === 'string' ? payload.inviterName : undefined);
+    const html = buildEmailHtml(inviteUrl, codeUrl, token, toEmail, typeof payload.inviterName === 'string' ? payload.inviterName : undefined);
     let result;
     if (RESEND_API_KEY) {
       result = await sendWithResend(toEmail, subject, html);

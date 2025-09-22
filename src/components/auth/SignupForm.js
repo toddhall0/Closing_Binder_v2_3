@@ -23,6 +23,21 @@ const SignupForm = ({ onToggleForm, onClose }) => {
 
   const { signUp, resendConfirmation } = useAuth();
 
+  // Prefill from URL params (inviteCode, email)
+  React.useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const inviteFromUrl = params.get('inviteCode') || '';
+      const emailFromUrl = params.get('email') || '';
+      if (inviteFromUrl) setInviteCode(inviteFromUrl);
+      if (emailFromUrl) {
+        setFormData(prev => ({ ...prev, email: emailFromUrl }));
+      }
+    } catch (_) {
+      // ignore
+    }
+  }, []);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({

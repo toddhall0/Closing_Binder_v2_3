@@ -7,11 +7,30 @@ const AcceptInvite = () => {
   const [done, setDone] = React.useState(false);
   const [error, setError] = React.useState('');
   const [redirect, setRedirect] = React.useState(null);
+  const [message, setMessage] = React.useState('');
 
   React.useEffect(() => {
     const run = async () => {
       try {
         const params = new URLSearchParams(location.search);
+        // Handle copy-to-clipboard helper: /accept-invite?copy=TOKEN&email=...
+        const copyCode = params.get('copy');
+        const copyEmail = params.get('email') || '';
+        if (copyCode) {
+          try {
+            if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+              await navigator.clipboard.writeText(copyCode);
+              setMessage('Invite code copied to clipboard. Redirecting…');
+            }
+          } catch (_) {
+            // Non-blocking: still redirect with code prefilled
+          }
+          const qp = new URLSearchParams();
+          if (copyEmail) qp.set('email', copyEmail);
+          qp.set('inviteCode', copyCode);
+          setRedirect(`/signup?${qp.toString()}`);
+          return;
+        }
         const type = params.get('type');
         const token = params.get('token');
         if (!type || !token) { setError('Missing invite parameters'); return; }
@@ -68,8 +87,8 @@ const AcceptInvite = () => {
           </>
         ) : (
           <>
-            <h1 className="text-xl font-semibold text-black">Accepting Invitation…</h1>
-            <p className="mt-2 text-sm text-gray-600">Please wait.</p>
+            <h1 className="text-xl font-semibold text-black">{message ? 'Preparing Invitation…' : 'Accepting Invitation…'}</h1>
+            <p className="mt-2 text-sm text-gray-600">{message || 'Please wait.'}</p>
           </>
         )}
       </div>

@@ -76,7 +76,7 @@ const Settings = () => {
       if (!user) { setInvites([]); return; }
       const { data } = await supabase
         .from('firm_invites')
-        .select('id, email, inserted_at, expires_at, accepted_at')
+        .select('id, email, token, inserted_at, expires_at, accepted_at')
         .eq('firm_owner_id', user.id)
         .order('inserted_at', { ascending: false });
       setInvites(data || []);
@@ -216,6 +216,7 @@ const Settings = () => {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Email</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Code</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Sent</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Expires</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Actions</th>
@@ -223,10 +224,35 @@ const Settings = () => {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-100">
                       {invites.filter(i => !i.accepted_at).length === 0 ? (
-                        <tr><td className="px-4 py-3 text-sm text-gray-600" colSpan={4}>No pending invites.</td></tr>
+                        <tr><td className="px-4 py-3 text-sm text-gray-600" colSpan={5}>No pending invites.</td></tr>
                       ) : invites.filter(i => !i.accepted_at).map(i => (
                         <tr key={i.id}>
                           <td className="px-4 py-2 text-sm text-gray-900">{i.email}</td>
+                          <td className="px-4 py-2 text-sm text-gray-700">
+                            {i.token ? (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={async () => { try { await navigator.clipboard.writeText(i.token); } catch (_) {} }}
+                                  className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-50"
+                                  title="Copy invite code"
+                                >
+                                  Copy code
+                                </button>
+                                <a
+                                  href={`${window.location.origin}/accept-invite?copy=${encodeURIComponent(i.token)}&email=${encodeURIComponent(i.email)}`}
+                                  className="text-black hover:underline"
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  title="Open link that copies code and pre-fills signup"
+                                >
+                                  Open link
+                                </a>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
+                          </td>
                           <td className="px-4 py-2 text-sm text-gray-700">{new Date(i.inserted_at).toLocaleString()}</td>
                           <td className="px-4 py-2 text-sm text-gray-700">{i.expires_at ? new Date(i.expires_at).toLocaleString() : '—'}</td>
                           <td className="px-4 py-2 text-sm text-gray-700">
